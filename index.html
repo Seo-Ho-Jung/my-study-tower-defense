@@ -1,0 +1,1730 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- PWA를 위한 메타 태그 및 매니페스트 링크 -->
+    <title>Lane Guardians: Final</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#111827">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="LaneGuardians">
+    <link rel="apple-touch-icon" href="https://placehold.co/192x192/38bdf8/ffffff?text=LG">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            overflow: hidden;
+            -webkit-user-select: none; /* Safari */
+            -ms-user-select: none; /* IE 10 and IE 11 */
+            user-select: none; /* Standard syntax */
+        }
+        canvas {
+            background-color: #1a202c; /* bg-gray-900 */
+            border-radius: 0.5rem;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+            border: 1px solid #4a5568; /* border-gray-600 */
+            cursor: pointer;
+        }
+        .hud-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background-color: rgba(0,0,0,0.3);
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid #4a5568;
+            font-weight: 700;
+            font-size: 1.125rem;
+            justify-content: center;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.7);
+            justify-content: center;
+            align-items: center;
+        }
+        .control-panel {
+            background-color: rgba(17, 24, 39, 0.5); /* bg-gray-900/50 */
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+        }
+        .unit-btn, .upgrade-btn {
+            font-size: 0.8rem;
+            line-height: 1.1rem;
+            height: 60px;
+        }
+        .unit-btn.selected {
+            border-color: #67e8f9; /* cyan-300 */
+            box-shadow: 0 0 10px #67e8f9;
+        }
+        .activity-btn-wrapper {
+            position: relative;
+            overflow: hidden;
+            border-radius: 0.5rem;
+        }
+        .activity-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 4px;
+            /* Smoother transition for long durations */
+            transition: width 1s linear; 
+        }
+        /* Custom styles for the range slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #4a5568;
+            border-radius: 5px;
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #a78bfa;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        input[type=range]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #a78bfa;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        @keyframes screenShake {
+          0%, 100% { transform: translate(0, 0); }
+          25% { transform: translate(-2px, 2px); }
+          50% { transform: translate(2px, -2px); }
+          75% { transform: translate(-2px, -2px); }
+        }
+        .shake {
+          animation: screenShake 0.1s linear;
+        }
+    </style>
+</head>
+<body class="bg-gray-800 text-white flex flex-col h-screen p-4">
+
+    <div id="game-ui-container" class="flex flex-col h-full">
+        <!-- Top HUD -->
+        <div id="top-hud" class="w-full flex-shrink-0">
+            <div class="w-full grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div class="hud-item"><span>❤️</span><span id="health">20</span></div>
+                <div class="hud-item"><span>💰</span><span id="resources">100</span></div>
+                <div class="hud-item"><span>🌊</span><span id="wave">0</span></div>
+                <div class="hud-item"><span>🎯</span><span id="score">0</span></div>
+            </div>
+        </div>
+
+        <!-- Game Canvas (takes up remaining space) -->
+        <div id="canvas-container" class="w-full flex-1 my-4 relative">
+            <canvas id="gameCanvas" class="w-full h-full"></canvas>
+            <div id="unit-action-menu" class="absolute hidden flex-col gap-1 p-2 bg-gray-800 bg-opacity-80 rounded-lg shadow-lg border border-gray-600">
+                <button id="moveUnitButton" class="w-full px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 rounded">이동</button>
+                <button id="sellUnitButton" class="w-full px-3 py-1 text-xs bg-red-600 hover:bg-red-700 rounded">판매</button>
+            </div>
+        </div>
+
+        <!-- Bottom Controls -->
+        <div id="bottom-controls" class="w-full flex-shrink-0 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="control-panel">
+                <h3 class="text-center font-bold mb-3 text-lg text-cyan-400 tracking-wider">유닛 상점</h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <div id="ranged-units" class="flex flex-col gap-2">
+                        <button id="selectRanged" class="unit-btn selected w-full bg-sky-600 border-2 border-sky-300 text-white font-bold py-2 px-2 rounded-lg transition">원거리<br>(10💰)</button>
+                        <button id="selectMidRanged" class="unit-btn w-full bg-teal-600 border-2 border-transparent text-white font-bold py-2 px-2 rounded-lg transition">중원거리<br>(40💰)</button>
+                        <button id="selectLargeRanged" class="unit-btn hidden w-full bg-sky-500 border-2 border-transparent text-white font-bold py-2 px-2 rounded-lg transition">대원거리<br>(100💰)</button>
+                        <button id="selectChainLightning" class="unit-btn hidden w-full bg-yellow-500 border-2 border-transparent text-white font-bold py-2 px-2 rounded-lg transition">체인 라이트닝<br>(200💰)</button>
+                    </div>
+                     <div id="melee-units" class="flex flex-col gap-2">
+                        <button id="selectMelee" class="unit-btn w-full bg-slate-600 border-2 border-transparent text-white font-bold py-2 px-2 rounded-lg transition">근접병사<br>(10💰)</button>
+                        <button id="selectMidMelee" class="unit-btn w-full bg-orange-600 border-2 border-transparent text-white font-bold py-2 px-2 rounded-lg transition">중근접병사<br>(40💰)</button>
+                        <button id="selectLargeMelee" class="unit-btn hidden w-full bg-orange-800 border-2 border-transparent text-white font-bold py-2 px-2 rounded-lg transition">대근접병사<br>(100💰)</button>
+                        <button id="selectBerserker" class="unit-btn hidden w-full bg-red-600 border-2 border-transparent text-white font-bold py-2 px-2 rounded-lg transition">광전사<br>(200💰)</button>
+                    </div>
+                </div>
+            </div>
+            <div class="control-panel">
+                <h3 class="text-center font-bold mb-3 text-lg text-yellow-400 tracking-wider">연구소</h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <button id="researchLargeRanged" class="unit-btn w-full bg-sky-800 border-2 border-transparent text-white font-bold py-2 px-2 rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed">대원거리 연구<br>(200💰)</button>
+                    <button id="researchLargeMelee" class="unit-btn w-full bg-slate-800 border-2 border-transparent text-white font-bold py-2 px-2 rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed">대근접 연구<br>(200💰)</button>
+                    <button id="researchChainLightning" class="unit-btn w-full bg-yellow-800 border-2 border-transparent text-white font-bold py-2 px-2 rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed">체인 라이트닝 연구<br>(300💰)</button>
+                    <button id="researchBerserker" class="unit-btn w-full bg-red-800 border-2 border-transparent text-white font-bold py-2 px-2 rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed">광전사 연구<br>(300💰)</button>
+                </div>
+                 <div class="mt-4">
+                        <h3 class="text-center font-bold mb-3 text-lg text-purple-400 tracking-wider">강화</h3>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button id="upgradeBaseHealth" class="upgrade-btn w-full bg-purple-800 hover:bg-purple-700 text-white font-bold py-2 px-2 rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed"></button>
+                            <button id="upgradeActivityReward" class="upgrade-btn w-full bg-purple-800 hover:bg-purple-700 text-white font-bold py-2 px-2 rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed"></button>
+                            <button id="upgradeRangedDamage" class="upgrade-btn w-full bg-purple-800 hover:bg-purple-700 text-white font-bold py-2 px-2 rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed"></button>
+                            <button id="upgradeMeleeHealth" class="upgrade-btn w-full bg-purple-800 hover:bg-purple-700 text-white font-bold py-2 px-2 rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed"></button>
+                        </div>
+                    </div>
+            </div>
+            <div class="flex flex-col gap-3">
+                 <div class="control-panel">
+                    <h3 class="text-center font-bold mb-2 text-lg text-lime-400 tracking-wider">자기계발 (25분)</h3>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="activity-btn-wrapper"><button id="studyButton" class="w-full h-12 bg-yellow-600 hover:bg-yellow-700 rounded-lg disabled:bg-gray-700 disabled:cursor-not-allowed">공부 (<span id="studyCount">0</span>)</button><div id="studyProgress" class="activity-progress bg-yellow-400"></div></div>
+                        <div class="activity-btn-wrapper"><button id="readingButton" class="w-full h-12 bg-blue-600 hover:bg-blue-700 rounded-lg disabled:bg-gray-700 disabled:cursor-not-allowed">독서 (<span id="readingCount">0</span>)</button><div id="readingProgress" class="activity-progress bg-blue-400"></div></div>
+                        <div class="activity-btn-wrapper"><button id="exerciseButton" class="w-full h-12 bg-red-600 hover:bg-red-700 rounded-lg disabled:bg-gray-700 disabled:cursor-not-allowed">운동 (<span id="exerciseCount">0</span>)</button><div id="exerciseProgress" class="activity-progress bg-red-400"></div></div>
+                    </div>
+                     <div class="mt-3"> <!-- Metronome controls -->
+                        <div class="flex justify-between items-center text-sm">
+                            <label for="metronomeButton" class="font-bold text-purple-300">메트로놈</label>
+                            <button id="metronomeButton" class="px-3 py-1 text-xs rounded-full bg-gray-600 hover:bg-gray-700 transition">OFF</button>
+                        </div>
+                        <div class="flex items-center gap-2 mt-1">
+                            <input type="range" id="bpmSlider" min="60" max="100" value="60" step="10" class="w-full">
+                            <span id="bpmDisplay" class="w-12 text-center font-mono bg-gray-700 rounded-md">60</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="control-panel grid grid-cols-2 gap-3">
+                     <button id="pauseButton" class="w-full h-12 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-bold disabled:bg-gray-700 disabled:cursor-not-allowed">일시정지</button>
+                     <button id="giveUpButton" class="w-full h-12 bg-red-800 hover:bg-red-900 rounded-lg text-white font-bold">포기하기</button>
+                </div>
+                <button id="startWaveButton" class="w-full h-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition disabled:bg-gray-500 disabled:cursor-not-allowed text-lg">웨이브 시작</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="gameOverModal" class="modal">
+        <div class="bg-gray-800 p-8 rounded-lg text-center shadow-2xl border border-cyan-400">
+            <h2 class="text-4xl font-bold mb-4 text-red-500">게임 오버</h2>
+            <p class="text-xl mb-2">최종 점수: <span id="finalScore" class="font-bold text-yellow-400">0</span></p>
+            <p class="text-xl mb-6">최종 웨이브: <span id="finalWave" class="font-bold text-cyan-400">0</span></p>
+            <button id="restartButton" class="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-6 rounded-lg text-lg transition-transform transform hover:scale-105">
+                다시 시작
+            </button>
+        </div>
+    </div>
+    <div id="pauseModal" class="modal">
+        <div class="text-center">
+            <h2 class="text-6xl font-bold text-purple-400 animate-pulse">일시정지됨</h2>
+            <p class="text-xl mt-4 text-gray-300">화면을 클릭하여 게임을 재개하세요.</p>
+        </div>
+    </div>
+    <div id="startModal" class="modal" style="display: flex;">
+        <div class="bg-gray-800 p-8 rounded-lg text-center shadow-2xl border border-cyan-400 max-w-lg">
+            <h2 class="text-4xl font-bold mb-4 text-cyan-400">Lane Guardians: Final</h2>
+            <p class="text-lg mb-4">
+                - 유닛을 배치하고 연구하여 기지를 방어하세요.<br>
+                - <span class="text-slate-400">근접 병사</span>는 적을 향해 움직이며 공격 시 <span class="text-yellow-400">넉백</span>시킵니다.<br>
+                - 유닛을 클릭하여 판매하고 전략을 수정하세요.<br>
+                - <span class="text-lime-400">자기계발</span> 활동(30분)으로 웨이브 사이에 자원을 모으세요.
+            </p>
+            <button id="startButton" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg text-lg transition-transform transform hover:scale-105">
+                게임 시작
+            </button>
+        </div>
+    </div>
+
+
+    <script>
+        // 서비스 워커 등록 스크립트
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').then(registration => {
+                    console.log('서비스 워커가 등록되었습니다:', registration);
+                }).catch(registrationError => {
+                    console.log('서비스 워커 등록에 실패했습니다:', registrationError);
+                });
+            });
+        }
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // UI 요소
+        const ui = {
+            health: document.getElementById('health'),
+            resources: document.getElementById('resources'),
+            wave: document.getElementById('wave'),
+            score: document.getElementById('score'),
+            gameOverModal: document.getElementById('gameOverModal'),
+            pauseModal: document.getElementById('pauseModal'),
+            startModal: document.getElementById('startModal'),
+            finalScore: document.getElementById('finalScore'),
+            finalWave: document.getElementById('finalWave'),
+            restartButton: document.getElementById('restartButton'),
+            startButton: document.getElementById('startButton'),
+            startWaveButton: document.getElementById('startWaveButton'),
+            pauseButton: document.getElementById('pauseButton'),
+            giveUpButton: document.getElementById('giveUpButton'),
+            metronomeButton: document.getElementById('metronomeButton'),
+            bpmSlider: document.getElementById('bpmSlider'),
+            bpmDisplay: document.getElementById('bpmDisplay'),
+            buttons: {
+                ranged: document.getElementById('selectRanged'),
+                melee: document.getElementById('selectMelee'),
+                midRanged: document.getElementById('selectMidRanged'),
+                midMelee: document.getElementById('selectMidMelee'),
+                largeRanged: document.getElementById('selectLargeRanged'),
+                largeMelee: document.getElementById('selectLargeMelee'),
+                chainLightning: document.getElementById('selectChainLightning'),
+                berserker: document.getElementById('selectBerserker'),
+            },
+            research: {
+                largeRanged: document.getElementById('researchLargeRanged'),
+                largeMelee: document.getElementById('researchLargeMelee'),
+                chainLightning: document.getElementById('researchChainLightning'),
+                berserker: document.getElementById('researchBerserker'),
+            },
+            upgrades: {
+                baseHealth: document.getElementById('upgradeBaseHealth'),
+                activityReward: document.getElementById('upgradeActivityReward'),
+                rangedDamage: document.getElementById('upgradeRangedDamage'),
+                meleeHealth: document.getElementById('upgradeMeleeHealth'),
+            },
+            activityButtons: {
+                study: document.getElementById('studyButton'),
+                reading: document.getElementById('readingButton'),
+                exercise: document.getElementById('exerciseButton'),
+            },
+            activityCounts: {
+                study: document.getElementById('studyCount'),
+                reading: document.getElementById('readingCount'),
+                exercise: document.getElementById('exerciseCount'),
+            },
+            activityProgress: {
+                study: document.getElementById('studyProgress'),
+                reading: document.getElementById('readingProgress'),
+                exercise: document.getElementById('exerciseProgress'),
+            },
+            unitActionMenu: document.getElementById('unit-action-menu'),
+            moveUnitButton: document.getElementById('moveUnitButton'),
+            sellUnitButton: document.getElementById('sellUnitButton'),
+        };
+        
+        const towerTypes = {
+            ranged: { cost: 10, size: 1, type: 'ranged' },
+            melee: { cost: 10, size: 1, type: 'melee' },
+            midRanged: { cost: 40, size: 2, type: 'mid-ranged' },
+            midMelee: { cost: 40, size: 2, type: 'mid-melee' },
+            largeRanged: { cost: 100, size: 3, type: 'large-ranged' },
+            largeMelee: { cost: 100, size: 3, type: 'large-melee' },
+            chainLightning: { cost: 200, size: 1, type: 'chain-lightning' },
+            berserker: { cost: 200, size: 1, type: 'berserker' }
+        };
+
+        const upgradeData = {
+            baseHealth: { name: '기지 체력 강화', costs: [100, 250, 500, 1000, 2000], effect: 5 },
+            activityReward: { name: '자기계발 보상 증가', costs: [150, 300, 600, 1200, 2500], effect: 25 },
+            rangedDamage: { name: '원거리 공격력 강화', costs: [200, 400, 800, 1600, 3200], effect: 0.1 },
+            meleeHealth: { name: '근접 체력 강화', costs: [200, 400, 800, 1600, 3200], effect: 0.1 },
+        };
+
+        let animationFrameId;
+        let gameState = {};
+        let synth; // Tone.js synth
+        let metronomeSynth; // 메트로놈 전용 신스
+        let cleaveSynth; // 광역 공격용 신스
+        let sniperSynth; // 저격수 전용 신스
+        let lastSoundTime = 0;
+        const soundOffset = 0.001;
+
+        function initializeGame() {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            stopMetronome();
+            lastSoundTime = 0;
+
+            const canvasContainer = document.getElementById('canvas-container');
+            if (canvasContainer.offsetWidth === 0 || canvasContainer.offsetHeight === 0) {
+                setTimeout(initializeGame, 50);
+                return;
+            }
+
+            canvas.width = canvasContainer.offsetWidth;
+            canvas.height = canvasContainer.offsetHeight;
+
+            gameState = {
+                health: 20,
+                resources: 60,
+                score: 0,
+                wave: 0,
+                towers: [],
+                enemies: [],
+                projectiles: [],
+                particles: [],
+                damageZones: [],
+                laneCount: 5,
+                lanes: [],
+                grid: [],
+                gridCols: 16,
+                gridRows: 15,
+                baseCols: 2,
+                cellSize: 0,
+                gameOver: false,
+                isPaused: false,
+                preWaveState: null,
+                metronomeEnabled: false,
+                metronomeBPM: 60,
+                metronomeIntervalId: null,
+                research: {
+                    largeRanged: false, largeMelee: false, chainLightning: false, berserker: false,
+                    costs: { largeRanged: 200, largeMelee: 200, chainLightning: 300, berserker: 300 }
+                },
+                upgradeLevels: { baseHealth: 0, activityReward: 0, rangedDamage: 0, meleeHealth: 0 },
+                completedActivities: { study: 0, reading: 0, exercise: 0 },
+                selectedTower: towerTypes.ranged,
+                selectedUnitForAction: null,
+                isMovingUnit: false,
+                waveInProgress: false,
+                hoveredCell: null,
+                hoveredTower: null,
+                activityInProgress: null,
+                activityTimer: 0,
+                activityPending: null,
+                activityCountdown: 0,
+                activityDuration: 1 * 60 ,
+                // 스폰 관련 상태
+                groupsToSpawn: 0,
+                enemiesPerGroup: 0,
+                enemiesLeftInGroup: 0,
+                groupSpawnTimer: 0,
+                intraGroupSpawnTimer: 0,
+            };
+            
+            gameState.health += gameState.upgradeLevels.baseHealth * upgradeData.baseHealth.effect;
+
+            const gridAreaWidth = canvas.width * 0.5;
+            gameState.cellSize = Math.min(gridAreaWidth / gameState.gridCols, canvas.height / gameState.gridRows);
+            gameState.gridAreaWidth = gameState.cellSize * gameState.gridCols;
+
+            for (let r = 0; r < gameState.gridRows; r++) {
+                gameState.grid[r] = [];
+                for (let c = 0; c < gameState.gridCols; c++) {
+                    gameState.grid[r][c] = null;
+                }
+            }
+
+            const laneHeight = canvas.height / gameState.laneCount;
+            for (let i = 0; i < gameState.laneCount; i++) {
+                gameState.lanes.push(laneHeight * i + laneHeight / 2);
+            }
+            
+            ui.pauseModal.style.display = 'none';
+            ui.pauseButton.textContent = '일시정지';
+            updateAllUI();
+            
+            ui.startWaveButton.textContent = '첫 웨이브 시작';
+            updateGameControlsState();
+            updateActivityProgressUI();
+            updateActivityCountUI();
+        }
+        
+        class Tower {
+            constructor(row, col, typeInfo) {
+                this.row = row; this.col = col; this.size = typeInfo.size; this.type = typeInfo.type;
+                this.cost = typeInfo.cost;
+                this.isStatic = !['melee', 'mid-melee', 'large-melee', 'berserker'].includes(this.type);
+                this.x = (col + this.size / 2) * gameState.cellSize; this.y = (row + this.size / 2) * gameState.cellSize;
+                this.originalX = this.x; this.originalY = this.y;
+                this.radius = gameState.cellSize * 0.4 * this.size; this.target = null; this.attackAnimation = 0;
+                this.hasMoved = false;
+                switch (this.type) {
+                    case 'ranged': this.range = this.radius * 15; this.fireRate = 45; this.damage = 40; this.maxHealth = 100; break;
+                    case 'melee': 
+                        this.range = this.radius * 6;
+                        this.fireRate = 45; this.damage = 15; this.speed = 0.5; this.knockback = 8; this.maxHealth = 150;
+                        break;
+                    case 'mid-ranged': this.range = this.radius * 6; this.fireRate = 50; this.damage = 70; this.maxHealth = 200; break;
+                    case 'mid-melee': 
+                        this.range = this.radius * 4;
+                        this.fireRate = 40; this.damage = 30; this.speed = 0.432; this.knockback = 12; this.maxHealth = 300;
+                        break;
+                    case 'large-ranged': 
+                        this.range = this.radius * 8;
+                        this.fireRate = 65; this.damage = 130; this.maxHealth = 400;
+                        break;
+                    case 'large-melee': 
+                        this.range = this.radius * 3;
+                        this.fireRate = 40; this.damage = 60; this.speed = 0.288; this.knockback = 15; this.maxHealth = 600;
+                        break;
+                    case 'chain-lightning':
+                        this.range = this.radius * 30;
+                        this.fireRate = 90;
+                        this.damage = 80; this.maxHealth = 300;
+                        this.chainBounces = 3;
+                        this.stunDuration = 30;
+                        break;
+                    case 'berserker':
+                        this.range = this.radius * 10; this.fireRate = 20; this.damage = 120; this.speed = 0.6; this.knockback = 18; this.maxHealth = 700;
+                        break;
+                }
+                
+                if (['ranged', 'mid-ranged', 'large-ranged', 'chain-lightning'].includes(this.type)) {
+                    this.damage *= (1 + gameState.upgradeLevels.rangedDamage * upgradeData.rangedDamage.effect);
+                } else {
+                    this.maxHealth *= (1 + gameState.upgradeLevels.meleeHealth * upgradeData.meleeHealth.effect);
+                }
+
+                this.currentHealth = this.maxHealth;
+                this.fireCooldown = 0;
+            }
+            draw() {
+                ctx.globalAlpha = 1;
+
+                if (this === gameState.hoveredTower || this === gameState.selectedUnitForAction) {
+                    ctx.fillStyle = 'rgba(167, 139, 250, 0.1)'; // Faint purple
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.range, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+                 if (this === gameState.selectedUnitForAction && gameState.isMovingUnit) {
+                    ctx.strokeStyle = '#a78bfa'; // Purple border for selected unit
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(this.col * gameState.cellSize, this.row * gameState.cellSize, this.size * gameState.cellSize, this.size * gameState.cellSize);
+                    ctx.lineWidth = 1;
+                }
+
+
+                switch (this.type) {
+                    case 'ranged': ctx.fillStyle = '#38bdf8'; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI); ctx.fill(); break;
+                    case 'melee': ctx.fillStyle = '#a1a1aa'; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI); ctx.fill(); break;
+                    case 'mid-ranged': ctx.fillStyle = '#2dd4bf'; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI); ctx.fill(); break;
+                    case 'mid-melee': ctx.fillStyle = '#fb923c'; ctx.fillRect(this.x - this.radius, this.y - this.radius, this.radius*2, this.radius*2); break;
+                    case 'large-ranged':
+                        ctx.fillStyle = '#6d28d9'; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI); ctx.fill();
+                        ctx.fillStyle = '#a78bfa'; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius * 0.7, 0, 2 * Math.PI); ctx.fill();
+                        break;
+                    case 'large-melee':
+                        ctx.fillStyle = '#9f1239'; ctx.fillRect(this.x - this.radius, this.y - this.radius, this.radius*2, this.radius*2);
+                        ctx.fillStyle = '#fb7185'; ctx.fillRect(this.x - this.radius*0.7, this.y - this.radius*0.7, this.radius*1.4, this.radius*1.4);
+                        break;
+                    case 'chain-lightning':
+                        ctx.fillStyle = '#facc15'; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI); ctx.fill();
+                        ctx.fillStyle = '#fde047'; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius * 0.5, 0, 2 * Math.PI); ctx.fill();
+                        break;
+                    case 'berserker':
+                        ctx.fillStyle = '#dc2626'; ctx.fillRect(this.x - this.radius, this.y - this.radius, this.radius*2, this.radius*2);
+                        ctx.fillStyle = '#ef4444'; ctx.fillRect(this.x - this.radius*0.7, this.y - this.radius*0.7, this.radius*1.4, this.radius*1.4);
+                        break;
+                }
+                if (this.attackAnimation > 0) {
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius * (1 + 0.5 * (10 - this.attackAnimation) / 10), 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                // Draw health bar for player units
+                const healthBarWidth = this.radius * 2;
+                const healthBarHeight = 5;
+                ctx.fillStyle = '#3f3f46';
+                ctx.fillRect(this.x - this.radius, this.y + this.radius + 5, healthBarWidth, healthBarHeight);
+                ctx.fillStyle = '#22c55e'; // Green health bar
+                ctx.fillRect(this.x - this.radius, this.y + this.radius + 5, healthBarWidth * (this.currentHealth / this.maxHealth), healthBarHeight);
+            }
+            update() {
+                if (this.fireCooldown > 0) this.fireCooldown--;
+                if (this.attackAnimation > 0) this.attackAnimation--;
+
+                if (!this.target || this.target.health <= 0 || getDistance(this.x, this.y, this.target.x, this.target.y) > this.range) {
+                    this.target = null;
+                    let closestEnemy = null;
+                    let minDistance = this.range;
+                    for (const enemy of gameState.enemies) {
+                        const distance = getDistance(this.x, this.y, enemy.x, enemy.y);
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            closestEnemy = enemy;
+                        }
+                    }
+                    this.target = closestEnemy;
+                }
+                
+                if (!this.isStatic) {
+                    if (gameState.waveInProgress) {
+                        if (this.target) {
+                            const distanceToTarget = getDistance(this.x, this.y, this.target.x, this.target.y);
+                            const attackRange = this.radius * 1.5;
+                            
+                            if (distanceToTarget > attackRange) {
+                                const angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+                                this.x += Math.cos(angle) * this.speed;
+                                this.y += Math.sin(angle) * this.speed;
+                                if (!this.hasMoved) {
+                                    for (let i = this.row; i < this.row + this.size; i++) {
+                                        for (let j = this.col; j < this.col + this.size; j++) {
+                                            if (i < gameState.gridRows && j < gameState.gridCols && gameState.grid[i][j] === this) {
+                                                gameState.grid[i][j] = null;
+                                            }
+                                        }
+                                    }
+                                    this.hasMoved = true;
+                                }
+                            }
+                        }
+                        if (this.x > canvas.width) this.x = canvas.width;
+                    } else {
+                        // Wave ended, instantly return to base
+                        this.x = this.originalX;
+                        this.y = this.originalY;
+                        if (this.hasMoved) {
+                            for (let i = this.row; i < this.row + this.size; i++) {
+                                for (let j = this.col; j < this.col + this.size; j++) {
+                                    if (i < gameState.gridRows && j < gameState.gridCols) {
+                                        gameState.grid[i][j] = this;
+                                    }
+                                }
+                            }
+                            this.hasMoved = false;
+                        }
+                    }
+                }
+
+                if (this.target && this.fireCooldown <= 0) {
+                    if (this.isStatic || getDistance(this.x, this.y, this.target.x, this.target.y) < this.radius * 1.5) {
+                        this.attack();
+                        this.fireCooldown = this.fireRate;
+                        this.attackAnimation = 10;
+                    }
+                }
+            }
+            attack() {
+                let special = null;
+                if (this.type === 'mid-ranged') {
+                    special = 'slow';
+                } else if (this.type === 'large-ranged') {
+                    special = 'artillery_shell';
+                }
+                
+                if (this.isStatic) {
+                    if (this.target) {
+                        if(this.type === 'chain-lightning') {
+                            let currentTarget = this.target;
+                            let enemiesHit = [currentTarget];
+                            let lastHitPosition = { x: this.x, y: this.y };
+                            let damage = this.damage;
+
+                            for (let i = 0; i <= this.chainBounces; i++) {
+                                if (!currentTarget) break;
+
+                                currentTarget.takeDamage(damage);
+                                currentTarget.applyStun(this.stunDuration);
+                                gameState.particles.push(new Particle(lastHitPosition.x, lastHitPosition.y, currentTarget.x, currentTarget.y, 'lightning'));
+                                
+                                lastHitPosition = { x: currentTarget.x, y: currentTarget.y };
+                                damage *= 0.75; // Damage falloff for subsequent bounces
+
+                                let nextTarget = null;
+                                let minDistance = Infinity;
+
+                                for (const enemy of gameState.enemies) {
+                                    if (!enemiesHit.includes(enemy) && enemy.health > 0) {
+                                        const distance = getDistance(currentTarget.x, currentTarget.y, enemy.x, enemy.y);
+                                        if (distance < minDistance) {
+                                            minDistance = distance;
+                                            nextTarget = enemy;
+                                        }
+                                    }
+                                }
+                                currentTarget = nextTarget;
+                                if (currentTarget) {
+                                    enemiesHit.push(currentTarget);
+                                }
+                            }
+                            playSound('sniperShot');
+                        } else {
+                            gameState.projectiles.push(new Projectile(this.x, this.y, this.target, this.damage, special));
+                            playSound('shoot');
+                        }
+                    }
+                } else {
+                    const attackRadius = this.radius * 1.8;
+                    let enemiesHitCount = 0;
+
+                    gameState.enemies.forEach(enemy => {
+                        if (getDistance(this.x, this.y, enemy.x, enemy.y) < attackRadius) {
+                            enemy.takeDamage(this.damage);
+                            enemiesHitCount++;
+                            if (enemy.health > 0) {
+                                const angle = Math.atan2(enemy.y - this.y, enemy.x - this.x);
+                                enemy.x += Math.cos(angle) * this.knockback;
+                                enemy.y += Math.sin(angle) * this.knockback;
+                            }
+                        }
+                    });
+
+                    if (enemiesHitCount > 0) {
+                        playSound('cleaveHit');
+                        if (this.type === 'large-melee' || this.type === 'berserker') {
+                           triggerScreenShake();
+                        }
+                    }
+                }
+            }
+            takeDamage(amount) {
+                this.currentHealth -= amount;
+            }
+        }
+        
+        class Enemy {
+            constructor(wave, type = 'normal') {
+                this.type = type;
+                this.lane = Math.floor(Math.random() * gameState.laneCount);
+                this.x = canvas.width;
+                this.y = gameState.lanes[this.lane];
+                this.radius = gameState.cellSize * 0.4 * (type === 'elite' ? 2 : 1);
+                this.originalSpeed = 0.7 + wave * 0.02 + Math.random() * 0.2;
+                this.speed = this.originalSpeed;
+                this.health = (50 + wave * 20 + Math.pow(wave, 1.8)) * (type === 'elite' ? 2 : 1) * 1.3;
+                this.value = 1;
+                this.damage = (type === 'elite' ? 2 : 1) * 5;
+                this.color = type === 'elite' ? '#991b1b' : '#ef4444';
+                this.maxHealth = this.health;
+                this.target = null;
+                this.detectionRange = gameState.cellSize * 8; // 적의 탐지 범위
+                this.attackRange = this.radius * 1.5;
+                this.fireRate = 90;
+                this.fireCooldown = 0;
+                this.isSlowed = false;
+                this.slowDuration = 0;
+                this.isStunned = false;
+                this.stunDuration = 0;
+            }
+            applySlow(duration) {
+                if (!this.isSlowed) { // Prevent re-slowing if already slowed
+                    this.isSlowed = true;
+                    this.slowDuration = duration;
+                    this.speed *= 0.5; // Slow to 50% speed
+                }
+            }
+            applyStun(duration) {
+                this.isStunned = true;
+                this.stunDuration = duration;
+            }
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                const healthBarWidth = this.radius * 2;
+                const healthBarHeight = 5;
+                ctx.fillStyle = '#3f3f46';
+                ctx.fillRect(this.x - this.radius, this.y - this.radius - 10, healthBarWidth, healthBarHeight);
+                ctx.fillStyle = '#10b981';
+                ctx.fillRect(this.x - this.radius, this.y - this.radius - 10, healthBarWidth * (this.health / this.maxHealth), healthBarHeight);
+
+                if (this.isSlowed) {
+                    ctx.fillStyle = 'rgba(0, 150, 255, 0.5)';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius + 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                if (this.isStunned) {
+                    ctx.fillStyle = 'rgba(255, 255, 0, 0.7)';
+                    ctx.font = 'bold 20px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('Zzz', this.x, this.y - this.radius - 15);
+                }
+            }
+            update() {
+                if (this.isStunned) {
+                    this.stunDuration--;
+                    if (this.stunDuration <= 0) {
+                        this.isStunned = false;
+                    }
+                    return; // Skip all other logic if stunned
+                }
+                if (this.slowDuration > 0) {
+                    this.slowDuration--;
+                    if (this.slowDuration <= 0) {
+                        this.isSlowed = false;
+                        this.speed = this.originalSpeed; // Restore speed
+                    }
+                }
+                if (this.fireCooldown > 0) this.fireCooldown--;
+
+                if (!this.target || this.target.currentHealth <= 0 || getDistance(this.x, this.y, this.target.x, this.target.y) > this.detectionRange) {
+                    this.target = null;
+                    let closestTower = null;
+                    let minDistance = this.detectionRange;
+                    for (const tower of gameState.towers) {
+                        const distance = getDistance(this.x, this.y, tower.x, tower.y);
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            closestTower = tower;
+                        }
+                    }
+                    this.target = closestTower;
+                }
+
+                if (this.target && getDistance(this.x, this.y, this.target.x, this.target.y) < this.attackRange) {
+                    if (this.fireCooldown <= 0) {
+                        this.target.takeDamage(this.damage);
+                        this.fireCooldown = this.fireRate;
+                    }
+                } else if (this.target) {
+                    const angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+                    this.x += Math.cos(angle) * this.speed;
+                    this.y += Math.sin(angle) * this.speed;
+                } else {
+                    this.x -= this.speed;
+                }
+            }
+            takeDamage(amount) {
+                this.health -= amount;
+                if (this.health <= 0) {
+                    addResources(this.value);
+                    addScore(this.value * 10);
+                    if (this.type === 'elite') {
+                        triggerScreenShake();
+                    }
+                    for (let i = 0; i < 10; i++) {
+                        gameState.particles.push(new Particle(this.x, this.y, this.color));
+                    }
+                }
+            }
+        }
+
+        class Projectile {
+            constructor(x, y, target, damage, special = null, fixedAngle = null) {
+                this.x = x; this.y = y; this.target = target; this.damage = damage;
+                this.special = special;
+                this.speed = 12;
+                this.radius = 4;
+                this.hitEnemies = [];
+                this.angle = fixedAngle !== null ? fixedAngle : (target ? Math.atan2(target.y - y, target.x - x) : 0);
+                if (this.special === 'artillery_shell') {
+                    this.speed = 5;
+                    this.gravity = 0.1;
+                    this.velocityY = -5;
+                    this.targetPos = {x: target.x, y: target.y};
+                    this.angle = Math.atan2(this.targetPos.y - y, this.targetPos.x - x);
+                }
+            }
+            update() {
+                if (this.special === 'artillery_shell') {
+                    if (!this.target || this.target.health <= 0) return true;
+                    const angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+                    this.x += Math.cos(angle) * this.speed;
+                    this.y += Math.sin(angle) * this.speed;
+                    if (getDistance(this.x, this.y, this.target.x, this.target.y) < this.target.radius) {
+                        gameState.damageZones.push(new DamageZone(this.target.x, this.target.y, gameState.cellSize * 3, this.damage, 180));
+                        for (let i = 0; i < 50; i++) {
+                            gameState.particles.push(new Particle(this.target.x, this.target.y, '#ff6600'));
+                        }
+                        triggerScreenShake();
+                        playSound('cleaveHit');
+                        return true; // Remove projectile
+                    }
+                    return false;
+                }
+                
+                if (!this.target || this.target.health <= 0) return true;
+                const angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+                this.x += Math.cos(angle) * this.speed;
+                this.y += Math.sin(angle) * this.speed;
+                if (getDistance(this.x, this.y, this.target.x, this.target.y) < this.target.radius) {
+                    this.target.takeDamage(this.damage);
+                    playSound('hit');
+
+                    if (this.special === 'slow') {
+                        this.target.applySlow(120); // Slow for 2 seconds (120 frames)
+                    }
+                    return true;
+                }
+                return false;
+            }
+            draw() {
+                ctx.fillStyle = '#fef08a';
+                if(this.special === 'artillery_shell') {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = "white";
+                }
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        class DamageZone {
+            constructor(x, y, radius, damage, duration) {
+                this.x = x;
+                this.y = y;
+                this.radius = radius;
+                this.damagePerFrame = damage / duration;
+                this.duration = duration;
+                this.maxDuration = duration;
+            }
+            update() {
+                this.duration--;
+                gameState.enemies.forEach(enemy => {
+                    if (getDistance(this.x, this.y, enemy.x, enemy.y) < this.radius) {
+                        enemy.takeDamage(this.damagePerFrame);
+                    }
+                });
+                return this.duration <= 0;
+            }
+            draw() {
+                ctx.globalAlpha = 0.5 * (this.duration / this.maxDuration);
+                ctx.fillStyle = 'orange';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        class Particle {
+            constructor(x, y, arg3, arg4, arg5) {
+                this.x = x;
+                this.y = y;
+                this.type = arg5;
+                this.life = 30;
+
+                if (this.type === 'lightning') {
+                    this.startX = x;
+                    this.startY = y;
+                    this.endX = arg3;
+                    this.endY = arg4;
+                    this.life = 15;
+                } else {
+                    this.color = arg3;
+                    this.size = Math.random() * 3 + 1;
+                    this.speedX = (Math.random() - 0.5) * 3;
+                    this.speedY = (Math.random() - 0.5) * 3;
+                }
+            }
+            update() {
+                if (this.type !== 'lightning') {
+                    this.x += this.speedX;
+                    this.y += this.speedY;
+                }
+                this.life--;
+            }
+            draw() {
+                ctx.globalAlpha = this.life / 30;
+                if (this.type === 'lightning') {
+                    ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(this.startX, this.startY);
+                    // Create jagged line for lightning effect
+                    const dx = this.endX - this.startX;
+                    const dy = this.endY - this.startY;
+                    const segments = 10;
+                    for (let i = 1; i <= segments; i++) {
+                        const newX = this.startX + (dx * i / segments) + (Math.random() - 0.5) * 10;
+                        const newY = this.startY + (dy * i / segments) + (Math.random() - 0.5) * 10;
+                        ctx.lineTo(newX, newY);
+                    }
+                    ctx.stroke();
+                } else {
+                    ctx.fillStyle = this.color;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.globalAlpha = 1;
+                ctx.lineWidth = 1;
+            }
+        }
+
+        function gameLoop() {
+            if (gameState.gameOver) return;
+            if (gameState.isPaused) {
+                animationFrameId = requestAnimationFrame(gameLoop);
+                return;
+            }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawGrid();
+
+            if (gameState.activityPending) {
+                gameState.activityCountdown--;
+                ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = "white";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+
+                ctx.font = "bold 80px sans-serif";
+                ctx.fillText(Math.ceil(gameState.activityCountdown / 60), canvas.width / 2, canvas.height / 2 - 40);
+                
+                ctx.font = "bold 20px sans-serif";
+                ctx.fillText("5초간 숨을 고르고, 바로 시작하세요!", canvas.width / 2, canvas.height / 2 + 40);
+                
+                if (gameState.activityCountdown <= 0) {
+                    addResources(50);
+                    gameState.activityInProgress = gameState.activityPending;
+                    gameState.activityTimer = gameState.activityDuration;
+                    gameState.activityPending = null;
+                    updateGameControlsState();
+                    startMetronome();
+                }
+            }
+
+            if (gameState.activityInProgress) {
+                gameState.activityTimer--;
+                updateActivityProgressUI();
+                
+                const minutes = Math.floor(gameState.activityTimer / 60 / 60);
+                const seconds = Math.floor((gameState.activityTimer / 60) % 60);
+                const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                
+                ctx.fillStyle = "white";
+                ctx.font = "bold 32px sans-serif";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "top";
+                ctx.fillText(timeString, canvas.width / 2, 20);
+
+                if (gameState.activityTimer <= 0) {
+                    addResources(200 + (gameState.upgradeLevels.activityReward * upgradeData.activityReward.effect));
+                    playSound('research');
+                    gameState.completedActivities[gameState.activityInProgress]++;
+                    updateActivityCountUI();
+                    gameState.activityInProgress = null;
+                    stopMetronome();
+                    updateGameControlsState();
+                    updateActivityProgressUI();
+                }
+            }
+
+            if (gameState.waveInProgress) {
+                if (gameState.groupSpawnTimer > 0) {
+                    gameState.groupSpawnTimer--;
+                } else if (gameState.groupsToSpawn > 0) {
+                    if (gameState.intraGroupSpawnTimer > 0) {
+                        gameState.intraGroupSpawnTimer--;
+                    } else if (gameState.enemiesLeftInGroup > 0) {
+                        const wave = gameState.wave;
+                        let enemyType = 'normal';
+                        if (wave >= 5) {
+                            let eliteChance = (wave <= 10) ? (wave - 4) * 0.1 : 0.7;
+                            if (Math.random() < eliteChance) enemyType = 'elite';
+                        }
+                        gameState.enemies.push(new Enemy(wave, enemyType));
+                        gameState.enemiesLeftInGroup--;
+                        gameState.intraGroupSpawnTimer = 10; // 그룹 내 적 스폰 간격
+                    } else {
+                        gameState.groupsToSpawn--;
+                        if (gameState.groupsToSpawn > 0) {
+                            gameState.enemiesLeftInGroup = gameState.enemiesPerGroup;
+                            gameState.groupSpawnTimer = 180; // 그룹 간 스폰 간격
+                        }
+                    }
+                }
+            }
+            
+            gameState.towers = gameState.towers.filter(tower => {
+                if (!gameState.isMovingUnit || tower !== gameState.selectedUnitForAction) {
+                    tower.update();
+                }
+
+                if (tower.currentHealth <= 0) {
+                    // Clear grid position
+                    if (tower.isStatic || !tower.hasMoved) {
+                        for (let i = tower.row; i < tower.row + tower.size; i++) {
+                            for (let j = tower.col; j < tower.col + tower.size; j++) {
+                                if (i < gameState.gridRows && j < gameState.gridCols && gameState.grid[i][j] === tower) {
+                                    gameState.grid[i][j] = null;
+                                }
+                            }
+                        }
+                    }
+                    return false; // Remove the tower
+                }
+                
+                if (!gameState.isMovingUnit || tower !== gameState.selectedUnitForAction) {
+                    tower.draw();
+                }
+                return true; // Keep the tower
+            });
+
+            const baseBoundary = gameState.baseCols * gameState.cellSize;
+            gameState.enemies = gameState.enemies.filter(e => {
+                e.update();
+                if (e.health <= 0) return false;
+                if (e.x < baseBoundary) {
+                    updateHealth(-1);
+                    return false;
+                }
+                e.draw();
+                return true;
+            });
+
+            gameState.projectiles = gameState.projectiles.filter(p => !p.update());
+            gameState.projectiles.forEach(p => p.draw());
+
+            gameState.damageZones = gameState.damageZones.filter(z => !z.update());
+            gameState.damageZones.forEach(z => z.draw());
+
+            gameState.particles = gameState.particles.filter(p => p.life > 0);
+            gameState.particles.forEach(p => { p.update(); p.draw(); });
+
+            drawHover();
+            
+            if (gameState.isMovingUnit && gameState.selectedUnitForAction) {
+                gameState.selectedUnitForAction.x = gameState.mousePos.x;
+                gameState.selectedUnitForAction.y = gameState.mousePos.y;
+                gameState.selectedUnitForAction.draw();
+            }
+
+            if (gameState.waveInProgress && gameState.enemies.length === 0 && gameState.groupsToSpawn === 0 && gameState.enemiesLeftInGroup === 0) {
+                gameState.waveInProgress = false;
+                addResources(0);
+                updateGameControlsState();
+                ui.startWaveButton.textContent = `다음 웨이브 시작 (${gameState.wave + 1})`;
+                playSound('waveEnd');
+            }
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function drawGrid() {
+            const { gridRows, gridCols, cellSize, gridAreaWidth, baseCols } = gameState;
+            for (let i = 0; i < gameState.laneCount; i++) {
+                ctx.fillStyle = i % 2 === 0 ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)';
+                ctx.fillRect(gridAreaWidth, i * (canvas.height / gameState.laneCount), canvas.width - gridAreaWidth, canvas.height / gameState.laneCount);
+            }
+            for (let r = 0; r < gridRows; r++) {
+                for (let c = 0; c < gridCols; c++) {
+                    ctx.strokeStyle = 'rgba(75, 85, 99, 0.5)';
+                    ctx.strokeRect(c * cellSize, r * cellSize, cellSize, cellSize);
+                }
+            }
+            ctx.fillStyle = 'rgba(6, 182, 212, 0.1)';
+            ctx.fillRect(0, 0, baseCols * cellSize, canvas.height);
+            ctx.strokeStyle = '#06b6d4';
+            ctx.strokeRect(0, 0, baseCols * cellSize, canvas.height);
+        }
+
+        function drawHover() {
+            if (gameState.isMovingUnit && gameState.selectedUnitForAction && gameState.hoveredCell) {
+                const { r, c } = gameState.hoveredCell;
+                const canPlace = canPlaceTower(r, c, gameState.selectedUnitForAction.size);
+                ctx.globalAlpha = 0.5;
+                ctx.fillStyle = canPlace ? 'rgba(56, 189, 248, 0.5)' : 'rgba(239, 68, 68, 0.5)';
+                ctx.fillRect(c * gameState.cellSize, r * gameState.cellSize, gameState.selectedUnitForAction.size * gameState.cellSize, gameState.selectedUnitForAction.size * gameState.cellSize);
+                ctx.globalAlpha = 1;
+            } else if (gameState.hoveredCell && !gameState.activityInProgress && gameState.selectedTower) {
+                const { r, c } = gameState.hoveredCell;
+                const towerSize = gameState.selectedTower.size;
+                const canPlace = canPlaceTower(r, c, towerSize);
+                ctx.globalAlpha = 0.5;
+                ctx.fillStyle = canPlace ? 'rgba(56, 189, 248, 0.5)' : 'rgba(239, 68, 68, 0.5)';
+                ctx.fillRect(c * gameState.cellSize, r * gameState.cellSize, towerSize * gameState.cellSize, towerSize * gameState.cellSize);
+                ctx.globalAlpha = 1;
+            }
+
+            if(gameState.hoveredTower && !gameState.isMovingUnit) {
+                ctx.strokeStyle = '#fef08a';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(gameState.hoveredTower.x, gameState.hoveredTower.y, gameState.hoveredTower.range, 0, 2 * Math.PI);
+                ctx.stroke();
+                ctx.lineWidth = 1;
+            }
+        }
+
+        function canPlaceTower(r, c, size) {
+            if (c < gameState.baseCols) return false;
+            if (r + size > gameState.gridRows || c + size > gameState.gridCols) return false;
+            for (let i = r; i < r + size; i++) {
+                for (let j = c; j < c + size; j++) {
+                    if (gameState.grid[i][j]) return false;
+                }
+            }
+            return true;
+        }
+
+        function placeTower(r, c) {
+            const towerInfo = gameState.selectedTower;
+            if (gameState.resources >= towerInfo.cost && canPlaceTower(r, c, towerInfo.size)) {
+                addResources(-towerInfo.cost);
+                const newTower = new Tower(r, c, towerInfo);
+                gameState.towers.push(newTower);
+                if (newTower.isStatic) {
+                    for (let i = r; i < r + newTower.size; i++) {
+                        for (let j = c; j < c + newTower.size; j++) {
+                            gameState.grid[i][j] = newTower;
+                        }
+                    }
+                }
+                playSound('place');
+            } else {
+                playSound('error');
+            }
+        }
+        
+        function sellTower(tower) {
+            if (!tower) return;
+            addResources(Math.floor(tower.cost * (tower.currentHealth / tower.maxHealth)));
+            playSound('sell');
+            
+            if (tower.isStatic || !tower.hasMoved) {
+                for (let i = tower.row; i < tower.row + tower.size; i++) {
+                    for (let j = tower.col; j < tower.col + tower.size; j++) {
+                        if(i < gameState.gridRows && j < gameState.gridCols && gameState.grid[i][j] === tower) {
+                           gameState.grid[i][j] = null;
+                        }
+                    }
+                }
+            }
+            gameState.towers = gameState.towers.filter(t => t !== tower);
+        }
+
+        function startWave() {
+            if (gameState.waveInProgress || gameState.activityInProgress) return;
+            
+            gameState.preWaveState = {
+                resources: gameState.resources,
+                health: gameState.health,
+                towers: JSON.parse(JSON.stringify(gameState.towers))
+            };
+
+            gameState.waveInProgress = true;
+            gameState.wave++;
+            
+            gameState.groupsToSpawn = 2 + Math.floor(gameState.wave / 2);
+            gameState.enemiesPerGroup = (3 + gameState.wave) * 2;
+            gameState.enemiesLeftInGroup = gameState.enemiesPerGroup;
+            gameState.groupSpawnTimer = 0;
+            gameState.intraGroupSpawnTimer = 0;
+
+            updateWaveUI();
+            updateGameControlsState();
+            playSound('waveStart');
+        }
+
+        function endGame(isVictory) {
+            if (gameState.gameOver) return;
+            gameState.gameOver = true;
+            cancelAnimationFrame(animationFrameId);
+            ui.finalScore.textContent = gameState.score;
+            ui.finalWave.textContent = gameState.wave;
+            ui.gameOverModal.style.display = 'flex';
+            playSound('gameOver');
+        }
+        
+        function togglePause() {
+            if (gameState.gameOver) return;
+            gameState.isPaused = !gameState.isPaused;
+            if (gameState.isPaused) {
+                ui.pauseButton.textContent = '계속하기';
+                ui.pauseModal.style.display = 'flex';
+                stopMetronome();
+            } else {
+                ui.pauseButton.textContent = '일시정지';
+                ui.pauseModal.style.display = 'none';
+                if (gameState.activityInProgress && gameState.metronomeEnabled) {
+                    startMetronome();
+                }
+            }
+            updateGameControlsState();
+        }
+
+        function updateAllUI() {
+            updateHealthUI(); updateResourcesUI(); updateWaveUI(); updateScoreUI();
+            updateUpgradeButtonsUI();
+        }
+        function updateHealth(change = 0) {
+            gameState.health += change;
+            if (gameState.health <= 0) {
+                gameState.health = 0;
+                endGame(false);
+            }
+            updateHealthUI();
+        }
+        function updateHealthUI() { ui.health.textContent = gameState.health; }
+        function addResources(amount) { gameState.resources += amount; updateResourcesUI(); }
+        function updateResourcesUI() { ui.resources.textContent = gameState.resources; updateGameControlsState(); }
+        function updateWaveUI() { ui.wave.textContent = gameState.wave; }
+        function addScore(amount) { gameState.score += amount; updateScoreUI(); }
+        function updateScoreUI() { ui.score.textContent = gameState.score; }
+        
+        function updateGameControlsState() {
+            const { activityInProgress, waveInProgress, isPaused, gameOver, activityPending } = gameState;
+            const disableAllActions = activityInProgress || waveInProgress || isPaused || !!activityPending;
+            
+            ui.pauseButton.disabled = gameOver || waveInProgress;
+            ui.giveUpButton.disabled = isPaused;
+
+            ui.startWaveButton.disabled = disableAllActions;
+
+            Object.values(ui.buttons).forEach(button => {
+                const towerTypeKey = Object.keys(towerTypes).find(key => ui.buttons[key.replace('-', '')] === button);
+                if (towerTypeKey) {
+                    button.disabled = disableAllActions || gameState.resources < towerTypes[towerTypeKey].cost;
+                }
+            });
+            
+            Object.keys(ui.research).forEach(key => {
+                const button = ui.research[key];
+                if(button) {
+                    button.disabled = disableAllActions || gameState.research[key] || gameState.resources < gameState.research.costs[key];
+                }
+            });
+            
+            Object.keys(ui.upgrades).forEach(key => {
+                const button = ui.upgrades[key];
+                const level = gameState.upgradeLevels[key];
+                const cost = upgradeData[key].costs[level];
+                if(button) {
+                    button.disabled = disableAllActions || !cost || gameState.resources < cost;
+                }
+            });
+
+            Object.values(ui.activityButtons).forEach(btn => {
+                btn.disabled = disableAllActions;
+            });
+        }
+        
+        function updateUpgradeButtonsUI() {
+            Object.keys(ui.upgrades).forEach(key => {
+                const button = ui.upgrades[key];
+                const level = gameState.upgradeLevels[key];
+                const data = upgradeData[key];
+                const cost = data.costs[level];
+
+                if (cost) {
+                    button.innerHTML = `${data.name} (Lv.${level})<br>(${cost}💰)`;
+                } else {
+                    button.innerHTML = `${data.name}<br>(MAX)`;
+                    button.disabled = true;
+                }
+            });
+        }
+
+        function selectTowerType(typeKey) {
+            gameState.selectedTower = towerTypes[typeKey];
+            Object.values(ui.buttons).forEach(btn => btn.classList.remove('selected', 'border-cyan-300', 'shadow-lg'));
+            const selectedButton = ui.buttons[typeKey];
+            if(selectedButton) selectedButton.classList.add('selected', 'border-cyan-300', 'shadow-lg');
+        }
+        
+        function handleResearch(typeKey) {
+            const cost = gameState.research.costs[typeKey];
+            if (gameState.resources >= cost && !gameState.research[typeKey]) {
+                addResources(-cost);
+                gameState.research[typeKey] = true;
+                const researchButton = ui.research[typeKey];
+                const unitButton = ui.buttons[typeKey];
+                researchButton.disabled = true;
+                researchButton.innerHTML = '연구 완료';
+                researchButton.classList.add('bg-gray-700', 'cursor-not-allowed');
+                researchButton.classList.remove('bg-sky-800', 'bg-slate-800', 'bg-yellow-800', 'bg-red-800');
+                if (unitButton) {
+                    unitButton.classList.remove('hidden');
+                }
+                playSound('research');
+            } else {
+                playSound('error');
+            }
+        }
+
+        function handleUpgrade(type) {
+            const level = gameState.upgradeLevels[type];
+            const cost = upgradeData[type].costs[level];
+            if (gameState.resources >= cost) {
+                addResources(-cost);
+                gameState.upgradeLevels[type]++;
+                
+                // 즉시 효과 적용 (체력)
+                if (type === 'baseHealth') {
+                    updateHealth(upgradeData.baseHealth.effect);
+                }
+                
+                updateUpgradeButtonsUI();
+                playSound('research');
+            } else {
+                playSound('error');
+            }
+        }
+
+        function startActivity(type) {
+            if (gameState.activityInProgress || gameState.waveInProgress || gameState.activityPending) {
+                playSound('error');
+                return;
+            }
+            gameState.activityPending = type;
+            gameState.activityCountdown = 5 * 60; // 5초 카운트다운
+            updateGameControlsState();
+        }
+
+        function updateActivityProgressUI() {
+            Object.values(ui.activityProgress).forEach(p => p.style.width = '0%');
+            if (!gameState.activityInProgress) return;
+            const progress = ((gameState.activityDuration - gameState.activityTimer) / gameState.activityDuration) * 100;
+            ui.activityProgress[gameState.activityInProgress].style.width = `${progress}%`;
+        }
+        
+        function updateActivityCountUI() {
+            ui.activityCounts.study.textContent = gameState.completedActivities.study;
+            ui.activityCounts.reading.textContent = gameState.completedActivities.reading;
+            ui.activityCounts.exercise.textContent = gameState.completedActivities.exercise;
+        }
+
+        function setupSound() {
+            synth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: "sine" },
+                envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 1 }
+            }).toDestination();
+            
+            metronomeSynth = new Tone.MembraneSynth({
+                pitchDecay: 0.01,
+                octaves: 10,
+                oscillator: { type: "sine" },
+                envelope: {
+                    attack: 0.001,
+                    decay: 0.4,
+                    sustain: 0.01,
+                    release: 1.4,
+                    attackCurve: "exponential"
+                }
+            }).toDestination();
+            
+            cleaveSynth = new Tone.MetalSynth({
+                frequency: 50,
+                envelope: { attack: 0.001, decay: 0.4, release: 0.2 },
+                harmonicity: 5.1,
+                modulationIndex: 32,
+                resonance: 4000,
+                octaves: 1.5
+            }).toDestination();
+
+            sniperSynth = new Tone.NoiseSynth({
+                noise: { type: 'pink' },
+                envelope: { attack: 0.005, decay: 0.15, sustain: 0 }
+            }).toDestination();
+        }
+        function playSound(type) {
+            if (!synth) return;
+            try {
+                let time = Tone.now();
+                if (time <= lastSoundTime) {
+                    time = lastSoundTime + soundOffset;
+                }
+                lastSoundTime = time;
+
+                switch(type) {
+                    case 'place': synth.triggerAttackRelease("C4", "8n", time); break;
+                    case 'sell': synth.triggerAttackRelease("E3", "8n", time); break;
+                    case 'shoot': synth.triggerAttackRelease("G5", "16n", time, 0.5); break;
+                    case 'hit': synth.triggerAttackRelease("C3", "16n", time, 0.3); break;
+                    case 'cleaveHit': cleaveSynth.triggerAttackRelease("C2", "8n", time, 0.8); break;
+                    case 'sniperShot': sniperSynth.triggerAttack(time); break;
+                    case 'waveStart': synth.triggerAttackRelease(["C4", "E4", "G4"], "4n", time); break;
+                    case 'waveEnd': synth.triggerAttackRelease(["G4", "E4", "C4"], "4n", time); break;
+                    case 'gameOver': synth.triggerAttackRelease(["C3", "G2", "C2"], "2n", time); break;
+                    case 'research': synth.triggerAttackRelease(["C5", "E5", "G5", "C6"], "8n", time); break;
+                    case 'error': synth.triggerAttackRelease("F#3", "8n", time); break;
+                    case 'tick': metronomeSynth.triggerAttackRelease("C4", "8n", time, 0.3); break;
+                }
+            } catch (e) {
+                console.error("Tone.js error:", e);
+            }
+        }
+
+        function startMetronome() {
+            stopMetronome(); 
+            if (gameState.metronomeEnabled) {
+                const interval = 60000 / gameState.metronomeBPM;
+                gameState.metronomeIntervalId = setInterval(() => {
+                    playSound('tick');
+                }, interval); 
+            }
+        }
+
+        function stopMetronome() {
+            if (gameState.metronomeIntervalId) {
+                clearInterval(gameState.metronomeIntervalId);
+                gameState.metronomeIntervalId = null;
+            }
+        }
+
+        function triggerScreenShake() {
+            const gameContainer = document.getElementById('game-ui-container');
+            if (gameContainer) {
+                gameContainer.classList.add('shake');
+                setTimeout(() => {
+                    gameContainer.classList.remove('shake');
+                }, 100);
+            }
+        }
+
+        function setupEventListeners() {
+            canvas.addEventListener('mousemove', e => {
+                const rect = canvas.getBoundingClientRect();
+                gameState.mousePos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+
+                const c = Math.floor(gameState.mousePos.x / gameState.cellSize);
+                const r = Math.floor(gameState.mousePos.y / gameState.cellSize);
+
+                if (r >= 0 && r < gameState.gridRows && c >= 0 && c < gameState.gridCols) {
+                    gameState.hoveredCell = { r, c };
+                    let foundTower = null;
+                    for (let i = gameState.towers.length - 1; i >= 0; i--) {
+                        const tower = gameState.towers[i];
+                        if (getDistance(gameState.mousePos.x, gameState.mousePos.y, tower.x, tower.y) < tower.radius) {
+                            foundTower = tower;
+                            break;
+                        }
+                    }
+                    gameState.hoveredTower = foundTower || gameState.grid[r][c];
+                } else {
+                    gameState.hoveredCell = null;
+                    gameState.hoveredTower = null;
+                }
+            });
+
+            canvas.addEventListener('click', e => {
+                if (gameState.isPaused || gameState.activityInProgress) return;
+
+                const rect = canvas.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const clickY = e.clientY - rect.top;
+
+                // If moving a unit, place it
+                if (gameState.isMovingUnit) {
+                    const { r, c } = gameState.hoveredCell;
+                    if (canPlaceTower(r, c, gameState.selectedUnitForAction.size)) {
+                        // Clear old grid position
+                        for (let i = gameState.selectedUnitForAction.row; i < gameState.selectedUnitForAction.row + gameState.selectedUnitForAction.size; i++) {
+                            for (let j = gameState.selectedUnitForAction.col; j < gameState.selectedUnitForAction.col + gameState.selectedUnitForAction.size; j++) {
+                                if (i < gameState.gridRows && j < gameState.gridCols) {
+                                    gameState.grid[i][j] = null;
+                                }
+                            }
+                        }
+                        // Set new position
+                        gameState.selectedUnitForAction.row = r;
+                        gameState.selectedUnitForAction.col = c;
+                        gameState.selectedUnitForAction.x = (c + gameState.selectedUnitForAction.size / 2) * gameState.cellSize;
+                        gameState.selectedUnitForAction.y = (r + gameState.selectedUnitForAction.size / 2) * gameState.cellSize;
+                        gameState.selectedUnitForAction.originalX = gameState.selectedUnitForAction.x;
+                        gameState.selectedUnitForAction.originalY = gameState.selectedUnitForAction.y;
+                        
+                        // Occupy new grid position
+                        for (let i = r; i < r + gameState.selectedUnitForAction.size; i++) {
+                            for (let j = c; j < c + gameState.selectedUnitForAction.size; j++) {
+                                gameState.grid[i][j] = gameState.selectedUnitForAction;
+                            }
+                        }
+                    }
+                    gameState.isMovingUnit = false;
+                    gameState.selectedUnitForAction = null;
+                    ui.unitActionMenu.classList.add('hidden');
+                    return;
+                }
+
+                let clickedTower = null;
+                for (let i = gameState.towers.length - 1; i >= 0; i--) {
+                    const tower = gameState.towers[i];
+                    const distance = getDistance(clickX, clickY, tower.x, tower.y);
+                    if (distance < tower.radius) {
+                        clickedTower = tower;
+                        break;
+                    }
+                }
+
+                if (clickedTower) {
+                    gameState.selectedUnitForAction = clickedTower;
+                    ui.unitActionMenu.style.left = `${clickX}px`;
+                    ui.unitActionMenu.style.top = `${clickY - 60}px`; // Position above the tower
+                    ui.unitActionMenu.classList.remove('hidden');
+                } else {
+                    ui.unitActionMenu.classList.add('hidden');
+                    gameState.selectedUnitForAction = null;
+                    if (!gameState.hoveredCell) return;
+                    const { r, c } = gameState.hoveredCell;
+                    if (!gameState.grid[r][c] && gameState.selectedTower) {
+                         placeTower(r, c);
+                    }
+                }
+            });
+            
+            ui.moveUnitButton.addEventListener('click', () => {
+                if (gameState.selectedUnitForAction) {
+                    gameState.isMovingUnit = true;
+                    ui.unitActionMenu.classList.add('hidden');
+                }
+            });
+
+            ui.sellUnitButton.addEventListener('click', () => {
+                if (gameState.selectedUnitForAction) {
+                    sellTower(gameState.selectedUnitForAction);
+                    gameState.selectedUnitForAction = null;
+                    ui.unitActionMenu.classList.add('hidden');
+                }
+            });
+
+
+            ui.startButton.addEventListener('click', () => {
+                ui.startModal.style.display = 'none';
+                setupSound();
+                initializeGame();
+                gameLoop();
+            });
+
+            ui.restartButton.addEventListener('click', () => {
+                ui.gameOverModal.style.display = 'none';
+                initializeGame();
+                gameLoop();
+            });
+
+            ui.startWaveButton.addEventListener('click', startWave);
+            ui.pauseButton.addEventListener('click', togglePause);
+            ui.pauseModal.addEventListener('click', togglePause);
+            
+            ui.metronomeButton.addEventListener('click', () => {
+                gameState.metronomeEnabled = !gameState.metronomeEnabled;
+                if (gameState.metronomeEnabled) {
+                    ui.metronomeButton.classList.remove('bg-gray-600');
+                    ui.metronomeButton.classList.add('bg-green-600');
+                    ui.metronomeButton.textContent = 'ON';
+                    if (gameState.activityInProgress) {
+                        startMetronome();
+                    }
+                } else {
+                    ui.metronomeButton.classList.remove('bg-green-600');
+                    ui.metronomeButton.classList.add('bg-gray-600');
+                    ui.metronomeButton.textContent = 'OFF';
+                    stopMetronome();
+                }
+            });
+            
+            ui.bpmSlider.addEventListener('input', (e) => {
+                gameState.metronomeBPM = e.target.value;
+                ui.bpmDisplay.textContent = e.target.value;
+                if (gameState.activityInProgress && gameState.metronomeEnabled) {
+                    startMetronome();
+                }
+            });
+
+            ui.giveUpButton.addEventListener('click', () => {
+                if (gameState.activityPending) {
+                    gameState.activityPending = null;
+                    gameState.activityCountdown = 0;
+                    updateGameControlsState();
+                    playSound('sell');
+                } else if (gameState.activityInProgress) {
+                    addResources(-50);
+                    gameState.activityInProgress = null;
+                    gameState.activityTimer = 0;
+                    stopMetronome();
+                    updateActivityProgressUI();
+                    updateGameControlsState();
+                    playSound('sell');
+                } else if (gameState.waveInProgress && gameState.preWaveState) {
+                    gameState.wave--;
+                    gameState.resources = gameState.preWaveState.resources;
+                    gameState.health = gameState.preWaveState.health;
+                    gameState.enemies = [];
+                    gameState.projectiles = [];
+                    gameState.particles = [];
+                    gameState.towers = [];
+                    gameState.activityInProgress = null;
+                    gameState.activityPending = null;
+                    gameState.activityTimer = 0;
+                    gameState.activityCountdown = 0;
+                    stopMetronome();
+                    updateActivityProgressUI();
+
+                    for (let r = 0; r < gameState.gridRows; r++) {
+                        for (let c = 0; c < gameState.gridCols; c++) {
+                            gameState.grid[r][c] = null;
+                        }
+                    }
+
+                    gameState.preWaveState.towers.forEach(savedTowerData => {
+                        const towerInfo = Object.values(towerTypes).find(t => t.type === savedTowerData.type);
+                        if (towerInfo) {
+                            const newTower = new Tower(savedTowerData.row, savedTowerData.col, towerInfo);
+                            newTower.currentHealth = savedTowerData.currentHealth;
+                            gameState.towers.push(newTower);
+                            if (newTower.isStatic || !newTower.hasMoved) {
+                                for (let i = newTower.row; i < newTower.row + newTower.size; i++) {
+                                    for (let j = newTower.col; j < newTower.col + newTower.size; j++) {
+                                        if (i < gameState.gridRows && j < gameState.gridCols) {
+                                            gameState.grid[i][j] = newTower;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    
+                    gameState.waveInProgress = false;
+                    ui.startWaveButton.textContent = `웨이브 시작 (${gameState.wave + 1})`;
+                    updateAllUI();
+                    playSound('sell');
+                    gameState.preWaveState = null;
+                } else {
+                    initializeGame();
+                    gameLoop();
+                }
+            });
+            
+            Object.keys(ui.buttons).forEach(key => {
+                if(ui.buttons[key]) {
+                    ui.buttons[key].addEventListener('click', () => selectTowerType(key));
+                }
+            });
+
+            Object.keys(ui.research).forEach(key => {
+                 if(ui.research[key]) {
+                    ui.research[key].addEventListener('click', () => handleResearch(key));
+                 }
+            });
+
+            Object.keys(ui.upgrades).forEach(key => {
+                 if(ui.upgrades[key]) {
+                    ui.upgrades[key].addEventListener('click', () => handleUpgrade(key));
+                 }
+            });
+
+            Object.keys(ui.activityButtons).forEach(key => {
+                ui.activityButtons[key].addEventListener('click', () => startActivity(key));
+            });
+            
+            window.addEventListener('resize', () => {
+                clearTimeout(window.resizedFinished);
+                window.resizedFinished = setTimeout(() => {
+                    const wasRunning = !gameState.gameOver && !gameState.isPaused;
+                    cancelAnimationFrame(animationFrameId);
+                    initializeGame();
+                    if (wasRunning) {
+                        gameLoop();
+                    }
+                }, 250);
+            });
+        }
+
+        function getDistance(x1, y1, x2, y2) {
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        setupEventListeners();
+    </script>
+</body>
+</html>
