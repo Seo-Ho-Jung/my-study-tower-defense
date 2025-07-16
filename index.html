@@ -144,8 +144,8 @@
             </div>
         </div>
 
-        <!-- Bottom Controls -->
-        <div id="bottom-controls" class="w-full flex-shrink-0 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Bottom Controls: 화면 크기에 따라 높이와 스크롤이 조절되도록 수정됨 -->
+        <div id="bottom-controls" class="w-full flex-shrink-0 grid grid-cols-1 md:grid-cols-3 gap-4 max-h-48 md:max-h-none overflow-y-auto">
             <div class="control-panel">
                 <h3 class="text-center font-bold mb-3 text-lg text-cyan-400 tracking-wider">유닛 상점</h3>
                 <div class="grid grid-cols-2 gap-3">
