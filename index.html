@@ -2,16 +2,8 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    
-    <title>Lane Guardians: Final</title>
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#111827">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="LaneGuardians">
-    <link rel="apple-touch-icon" href="https://placehold.co/192x192/38bdf8/ffffff?text=LG">
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>다중 레인 디펜스 (모바일 최적화)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -24,10 +16,6 @@
             -webkit-user-select: none; /* Safari */
             -ms-user-select: none; /* IE 10 and IE 11 */
             user-select: none; /* Standard syntax */
-            /* iOS 스크롤 바운스 방지 */
-            position: fixed;
-            width: 100%;
-            height: 100%;
         }
         canvas {
             background-color: #1a202c; /* bg-gray-900 */
@@ -62,14 +50,20 @@
             align-items: center;
         }
         .control-panel {
-            background-color: rgba(17, 24, 39, 0.5); /* bg-gray-900/50 */
+            background-color: rgba(17, 24, 39, 0.8); /* bg-gray-900/80 */
             border-radius: 0.5rem;
             padding: 0.75rem;
         }
+        /* [수정됨] 모바일 터치에 용이하도록 버튼 크기 및 스타일 변경 */
         .unit-btn, .upgrade-btn {
-            font-size: 0.8rem;
-            line-height: 1.1rem;
-            height: 60px;
+            font-size: 0.9rem;
+            line-height: 1.2rem;
+            height: 70px; /* 버튼 높이 증가 */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
         }
         .unit-btn.selected {
             border-color: #67e8f9; /* cyan-300 */
@@ -85,7 +79,7 @@
             bottom: 0;
             left: 0;
             height: 4px;
-            transition: width 1s linear; 
+            transition: width 1s linear;
         }
         input[type=range] {
             -webkit-appearance: none;
@@ -113,97 +107,102 @@
             border-radius: 50%;
         }
         @keyframes screenShake {
-          0%, 100% { transform: translate(0, 0); }
-          25% { transform: translate(-2px, 2px); }
-          50% { transform: translate(2px, -2px); }
-          75% { transform: translate(-2px, -2px); }
+            0%, 100% { transform: translate(0, 0); }
+            25% { transform: translate(-2px, 2px); }
+            50% { transform: translate(2px, -2px); }
+            75% { transform: translate(-2px, -2px); }
         }
         .shake {
-          animation: screenShake 0.1s linear;
+            animation: screenShake 0.1s linear;
         }
     </style>
 </head>
-<body class="bg-gray-800 text-white h-screen">
+<body class="bg-gray-800 text-white flex flex-col h-screen p-2 md:p-4">
 
-    <div id="game-ui-container" class="flex flex-col lg:flex-row h-full w-full p-2 lg:p-4 gap-4">
-        
-        <div class="flex flex-col flex-1 h-full min-w-0">
-            <div id="top-hud" class="w-full flex-shrink-0">
-                <div class="w-full grid grid-cols-2 md:grid-cols-4 gap-2">
-                    <div class="hud-item"><span>❤️</span><span id="health">20</span></div>
-                    <div class="hud-item"><span>💰</span><span id="resources">100</span></div>
-                    <div class="hud-item"><span>🌊</span><span id="wave">0</span></div>
-                    <div class="hud-item"><span>🎯</span><span id="score">0</span></div>
-                </div>
-            </div>
-
-            <div id="canvas-container" class="w-full flex-1 my-2 lg:my-4 relative">
-                <canvas id="gameCanvas" class="w-full h-full"></canvas>
-                <div id="unit-action-menu" class="absolute hidden flex-col gap-1 p-2 bg-gray-800 bg-opacity-80 rounded-lg shadow-lg border border-gray-600">
-                    <button id="moveUnitButton" class="w-full px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 rounded">이동</button>
-                    <button id="sellUnitButton" class="w-full px-3 py-1 text-xs bg-red-600 hover:bg-red-700 rounded">판매</button>
-                </div>
+    <div id="game-ui-container" class="flex flex-col h-full">
+        <div id="top-hud" class="w-full flex-shrink-0">
+            <div class="w-full grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div class="hud-item"><span>❤️</span><span id="health">20</span></div>
+                <div class="hud-item"><span>💰</span><span id="resources">100</span></div>
+                <div class="hud-item"><span>🌊</span><span id="wave">0</span></div>
+                <div class="hud-item"><span>🎯</span><span id="score">0</span></div>
             </div>
         </div>
 
-        <div id="side-controls" class="w-full lg:w-80 xl:w-96 flex-shrink-0 flex flex-col gap-3 overflow-y-auto">
-            <div class="control-panel">
-                <h3 class="text-center font-bold mb-3 text-lg text-cyan-400 tracking-wider">유닛 상점</h3>
-                <div class="grid grid-cols-2 gap-3">
-                    <div id="ranged-units" class="flex flex-col gap-2">
-                        <button id="selectRanged" class="unit-btn selected w-full bg-sky-600 border-2 border-sky-300 text-white font-bold py-2 px-2 rounded-lg transition">원거리<br>(10💰)</button>
-                        <button id="selectMidRanged" class="unit-btn w-full bg-teal-600 border-2 border-transparent text-white font-bold py-2 px-2 rounded-lg transition">중원거리<br>(40💰)</button>
-                        <button id="selectLargeRanged" class="unit-btn hidden w-full bg-sky-500 border-2 border-transparent text-white font-bold py-2 px-2 rounded-lg transition">대원거리<br>(100💰)</button>
-                        <button id="selectChainLightning" class="unit-btn hidden w-full bg-yellow-500 border-2 border-transparent text-white font-bold py-2 px-2 rounded-lg transition">체인 라이트닝<br>(200💰)</button>
-                    </div>
-                     <div id="melee-units" class="flex flex-col gap-2">
-                        <button id="selectMelee" class="unit-btn w-full bg-slate-600 border-2 border-transparent text-white font-bold py-2 px-2 rounded-lg transition">근접병사<br>(10💰)</button>
-                        <button id="selectMidMelee" class="unit-btn w-full bg-orange-600 border-2 border-transparent text-white font-bold py-2 px-2 rounded-lg transition">중근접병사<br>(40💰)</button>
-                        <button id="selectLargeMelee" class="unit-btn hidden w-full bg-orange-800 border-2 border-transparent text-white font-bold py-2 px-2 rounded-lg transition">대근접병사<br>(100💰)</button>
-                        <button id="selectBerserker" class="unit-btn hidden w-full bg-red-600 border-2 border-transparent text-white font-bold py-2 px-2 rounded-lg transition">광전사<br>(200💰)</button>
-                    </div>
-                </div>
+        <div id="canvas-container" class="w-full flex-1 my-2 md:my-4 relative">
+            <canvas id="gameCanvas" class="w-full h-full"></canvas>
+            <div id="unit-action-menu" class="absolute hidden flex-col gap-1 p-2 bg-gray-800 bg-opacity-80 rounded-lg shadow-lg border border-gray-600">
+                <button id="moveUnitButton" class="w-full px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 rounded">이동</button>
+                <button id="sellUnitButton" class="w-full px-3 py-1 text-xs bg-red-600 hover:bg-red-700 rounded">판매</button>
             </div>
-            <div class="control-panel">
-                <h3 class="text-center font-bold mb-3 text-lg text-yellow-400 tracking-wider">연구소</h3>
-                <div class="grid grid-cols-2 gap-3">
-                    <button id="researchLargeRanged" class="unit-btn w-full bg-sky-800 border-2 border-transparent text-white font-bold py-2 px-2 rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed">대원거리 연구<br>(200💰)</button>
-                    <button id="researchLargeMelee" class="unit-btn w-full bg-slate-800 border-2 border-transparent text-white font-bold py-2 px-2 rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed">대근접 연구<br>(200💰)</button>
-                    <button id="researchChainLightning" class="unit-btn w-full bg-yellow-800 border-2 border-transparent text-white font-bold py-2 px-2 rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed">체인 라이트닝 연구<br>(300💰)</button>
-                    <button id="researchBerserker" class="unit-btn w-full bg-red-800 border-2 border-transparent text-white font-bold py-2 px-2 rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed">광전사 연구<br>(300💰)</button>
-                </div>
-                 <div class="mt-4">
-                        <h3 class="text-center font-bold mb-3 text-lg text-purple-400 tracking-wider">강화</h3>
-                        <div class="grid grid-cols-2 gap-3">
-                            <button id="upgradeBaseHealth" class="upgrade-btn w-full bg-purple-800 hover:bg-purple-700 text-white font-bold py-2 px-2 rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed"></button>
-                            <button id="upgradeActivityReward" class="upgrade-btn w-full bg-purple-800 hover:bg-purple-700 text-white font-bold py-2 px-2 rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed"></button>
-                            <button id="upgradeRangedDamage" class="upgrade-btn w-full bg-purple-800 hover:bg-purple-700 text-white font-bold py-2 px-2 rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed"></button>
-                            <button id="upgradeMeleeHealth" class="upgrade-btn w-full bg-purple-800 hover:bg-purple-700 text-white font-bold py-2 px-2 rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed"></button>
+        </div>
+
+        <div id="bottom-controls" class="w-full flex-shrink-0 flex flex-col">
+            <div class="flex bg-gray-900 rounded-t-lg">
+                <button id="tab-shop" class="flex-1 p-2 md:p-3 font-bold text-base md:text-lg border-b-4 border-cyan-400 text-cyan-400">상점</button>
+                <button id="tab-research" class="flex-1 p-2 md:p-3 font-bold text-base md:text-lg border-b-4 border-transparent text-gray-400">연구/강화</button>
+                <button id="tab-activity" class="flex-1 p-2 md:p-3 font-bold text-base md:text-lg border-b-4 border-transparent text-gray-400">활동</button>
+            </div>
+
+            <div class="control-panel flex-1 rounded-t-none">
+                <div id="panel-shop">
+                    <div class="grid grid-cols-2 gap-3">
+                         <div id="ranged-units" class="flex flex-col gap-2">
+                            <button id="selectRanged" class="unit-btn selected w-full bg-sky-600 border-2 border-sky-300 text-white font-bold rounded-lg transition">원거리<br>(10💰)</button>
+                            <button id="selectMidRanged" class="unit-btn w-full bg-teal-600 border-2 border-transparent text-white font-bold rounded-lg transition">중원거리<br>(40💰)</button>
+                            <button id="selectLargeRanged" class="unit-btn hidden w-full bg-sky-500 border-2 border-transparent text-white font-bold rounded-lg transition">대원거리<br>(100💰)</button>
+                            <button id="selectChainLightning" class="unit-btn hidden w-full bg-yellow-500 border-2 border-transparent text-white font-bold rounded-lg transition">체인<br>라이트닝<br>(200💰)</button>
+                        </div>
+                         <div id="melee-units" class="flex flex-col gap-2">
+                            <button id="selectMelee" class="unit-btn w-full bg-slate-600 border-2 border-transparent text-white font-bold rounded-lg transition">근접병사<br>(10💰)</button>
+                            <button id="selectMidMelee" class="unit-btn w-full bg-orange-600 border-2 border-transparent text-white font-bold rounded-lg transition">중근접병사<br>(40💰)</button>
+                            <button id="selectLargeMelee" class="unit-btn hidden w-full bg-orange-800 border-2 border-transparent text-white font-bold rounded-lg transition">대근접병사<br>(100💰)</button>
+                            <button id="selectBerserker" class="unit-btn hidden w-full bg-red-600 border-2 border-transparent text-white font-bold rounded-lg transition">광전사<br>(200💰)</button>
                         </div>
                     </div>
-            </div>
-            <div class="control-panel">
-                <h3 class="text-center font-bold mb-2 text-lg text-lime-400 tracking-wider">자기계발 (25분)</h3>
-                <div class="grid grid-cols-3 gap-2">
-                    <div class="activity-btn-wrapper"><button id="studyButton" class="w-full h-12 bg-yellow-600 hover:bg-yellow-700 rounded-lg disabled:bg-gray-700 disabled:cursor-not-allowed">공부 (<span id="studyCount">0</span>)</button><div id="studyProgress" class="activity-progress bg-yellow-400"></div></div>
-                    <div class="activity-btn-wrapper"><button id="readingButton" class="w-full h-12 bg-blue-600 hover:bg-blue-700 rounded-lg disabled:bg-gray-700 disabled:cursor-not-allowed">독서 (<span id="readingCount">0</span>)</button><div id="readingProgress" class="activity-progress bg-blue-400"></div></div>
-                    <div class="activity-btn-wrapper"><button id="exerciseButton" class="w-full h-12 bg-red-600 hover:bg-red-700 rounded-lg disabled:bg-gray-700 disabled:cursor-not-allowed">운동 (<span id="exerciseCount">0</span>)</button><div id="exerciseProgress" class="activity-progress bg-red-400"></div></div>
+                    <button id="startWaveButton" class="mt-4 w-full h-14 bg-green-600 hover:bg-green-700 text-white font-bold text-lg rounded-lg transition disabled:bg-gray-500 disabled:cursor-not-allowed">웨이브 시작</button>
                 </div>
-                 <div class="mt-3"> <div class="flex justify-between items-center text-sm">
-                        <label for="metronomeButton" class="font-bold text-purple-300">메트로놈</label>
-                        <button id="metronomeButton" class="px-3 py-1 text-xs rounded-full bg-gray-600 hover:bg-gray-700 transition">OFF</button>
+
+                <div id="panel-research" class="hidden">
+                    <h3 class="text-center font-bold mb-2 text-lg text-yellow-400 tracking-wider">연구소</h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button id="researchLargeRanged" class="unit-btn w-full bg-sky-800 border-2 border-transparent text-white font-bold rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed">대원거리<br>연구<br>(200💰)</button>
+                        <button id="researchLargeMelee" class="unit-btn w-full bg-slate-800 border-2 border-transparent text-white font-bold rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed">대근접<br>연구<br>(200💰)</button>
+                        <button id="researchChainLightning" class="unit-btn w-full bg-yellow-800 border-2 border-transparent text-white font-bold rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed">체인<br>라이트닝<br>연구(300💰)</button>
+                        <button id="researchBerserker" class="unit-btn w-full bg-red-800 border-2 border-transparent text-white font-bold rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed">광전사<br>연구<br>(300💰)</button>
                     </div>
-                    <div class="flex items-center gap-2 mt-1">
-                        <input type="range" id="bpmSlider" min="60" max="100" value="60" step="10" class="w-full">
-                        <span id="bpmDisplay" class="w-12 text-center font-mono bg-gray-700 rounded-md">60</span>
+                    <h3 class="text-center font-bold mt-4 mb-2 text-lg text-purple-400 tracking-wider">강화</h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button id="upgradeBaseHealth" class="upgrade-btn w-full bg-purple-800 hover:bg-purple-700 text-white font-bold rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed"></button>
+                        <button id="upgradeActivityReward" class="upgrade-btn w-full bg-purple-800 hover:bg-purple-700 text-white font-bold rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed"></button>
+                        <button id="upgradeRangedDamage" class="upgrade-btn w-full bg-purple-800 hover:bg-purple-700 text-white font-bold rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed"></button>
+                        <button id="upgradeMeleeHealth" class="upgrade-btn w-full bg-purple-800 hover:bg-purple-700 text-white font-bold rounded-lg transition disabled:bg-gray-700 disabled:cursor-not-allowed"></button>
+                    </div>
+                </div>
+
+                <div id="panel-activity" class="hidden">
+                    <h3 class="text-center font-bold mb-2 text-lg text-lime-400 tracking-wider">자기계발 (25분)</h3>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="activity-btn-wrapper"><button id="studyButton" class="w-full h-12 bg-yellow-600 hover:bg-yellow-700 rounded-lg disabled:bg-gray-700 disabled:cursor-not-allowed">공부 (<span id="studyCount">0</span>)</button><div id="studyProgress" class="activity-progress bg-yellow-400"></div></div>
+                        <div class="activity-btn-wrapper"><button id="readingButton" class="w-full h-12 bg-blue-600 hover:bg-blue-700 rounded-lg disabled:bg-gray-700 disabled:cursor-not-allowed">독서 (<span id="readingCount">0</span>)</button><div id="readingProgress" class="activity-progress bg-blue-400"></div></div>
+                        <div class="activity-btn-wrapper"><button id="exerciseButton" class="w-full h-12 bg-red-600 hover:bg-red-700 rounded-lg disabled:bg-gray-700 disabled:cursor-not-allowed">운동 (<span id="exerciseCount">0</span>)</button><div id="exerciseProgress" class="activity-progress bg-red-400"></div></div>
+                    </div>
+                    <div class="mt-3">
+                        <div class="flex justify-between items-center text-sm">
+                            <label for="metronomeButton" class="font-bold text-purple-300">메트로놈</label>
+                            <button id="metronomeButton" class="px-3 py-1 text-xs rounded-full bg-gray-600 hover:bg-gray-700 transition">OFF</button>
+                        </div>
+                        <div class="flex items-center gap-2 mt-1">
+                            <input type="range" id="bpmSlider" min="60" max="100" value="60" step="10" class="w-full">
+                            <span id="bpmDisplay" class="w-12 text-center font-mono bg-gray-700 rounded-md">60</span>
+                        </div>
+                    </div>
+                    <div class="mt-4 grid grid-cols-2 gap-3">
+                       <button id="pauseButton" class="w-full h-12 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-bold disabled:bg-gray-700 disabled:cursor-not-allowed">일시정지</button>
+                       <button id="giveUpButton" class="w-full h-12 bg-red-800 hover:bg-red-900 rounded-lg text-white font-bold">포기하기</button>
                     </div>
                 </div>
             </div>
-            <div class="control-panel grid grid-cols-2 gap-3">
-                 <button id="pauseButton" class="w-full h-12 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-bold disabled:bg-gray-700 disabled:cursor-not-allowed">일시정지</button>
-                 <button id="giveUpButton" class="w-full h-12 bg-red-800 hover:bg-red-900 rounded-lg text-white font-bold">포기하기</button>
-            </div>
-            <button id="startWaveButton" class="w-full h-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition disabled:bg-gray-500 disabled:cursor-not-allowed text-lg min-h-[48px]">웨이브 시작</button>
         </div>
     </div>
 
@@ -238,24 +237,12 @@
         </div>
     </div>
 
-    <script>
-        // 서비스 워커 등록 스크립트
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js').then(registration => {
-                    console.log('서비스 워커가 등록되었습니다:', registration);
-                }).catch(registrationError => {
-                    console.log('서비스 워커 등록에 실패했습니다:', registrationError);
-                });
-            });
-        }
-        
-        // --- 나머지 스크립트 코드는 이전과 동일합니다 ---
-        // (스크립트 내용은 변경할 필요가 없습니다. 레이아웃만 변경되었습니다.)
 
+    <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
+        // UI 요소
         const ui = {
             health: document.getElementById('health'),
             resources: document.getElementById('resources'),
@@ -314,6 +301,16 @@
             unitActionMenu: document.getElementById('unit-action-menu'),
             moveUnitButton: document.getElementById('moveUnitButton'),
             sellUnitButton: document.getElementById('sellUnitButton'),
+            tabs: {
+                shop: document.getElementById('tab-shop'),
+                research: document.getElementById('tab-research'),
+                activity: document.getElementById('tab-activity'),
+            },
+            panels: {
+                shop: document.getElementById('panel-shop'),
+                research: document.getElementById('panel-research'),
+                activity: document.getElementById('panel-activity'),
+            }
         };
         
         const towerTypes = {
@@ -433,6 +430,7 @@
             updateGameControlsState();
             updateActivityProgressUI();
             updateActivityCountUI();
+            switchTab('shop'); // 기본으로 상점 탭을 보여줌
         }
         
         class Tower {
@@ -493,7 +491,7 @@
                     ctx.arc(this.x, this.y, this.range, 0, 2 * Math.PI);
                     ctx.fill();
                 }
-                 if (this === gameState.selectedUnitForAction && gameState.isMovingUnit) {
+                    if (this === gameState.selectedUnitForAction && gameState.isMovingUnit) {
                     ctx.strokeStyle = '#a78bfa'; // Purple border for selected unit
                     ctx.lineWidth = 3;
                     ctx.strokeRect(this.col * gameState.cellSize, this.row * gameState.cellSize, this.size * gameState.cellSize, this.size * gameState.cellSize);
@@ -529,11 +527,12 @@
                     ctx.arc(this.x, this.y, this.radius * (1 + 0.5 * (10 - this.attackAnimation) / 10), 0, Math.PI * 2);
                     ctx.fill();
                 }
+                // Draw health bar for player units
                 const healthBarWidth = this.radius * 2;
                 const healthBarHeight = 5;
                 ctx.fillStyle = '#3f3f46';
                 ctx.fillRect(this.x - this.radius, this.y + this.radius + 5, healthBarWidth, healthBarHeight);
-                ctx.fillStyle = '#22c55e';
+                ctx.fillStyle = '#22c55e'; // Green health bar
                 ctx.fillRect(this.x - this.radius, this.y + this.radius + 5, healthBarWidth * (this.currentHealth / this.maxHealth), healthBarHeight);
             }
             update() {
@@ -578,6 +577,7 @@
                         }
                         if (this.x > canvas.width) this.x = canvas.width;
                     } else {
+                        // Wave ended, instantly return to base
                         this.x = this.originalX;
                         this.y = this.originalY;
                         if (this.hasMoved) {
@@ -625,7 +625,7 @@
                                 gameState.particles.push(new Particle(lastHitPosition.x, lastHitPosition.y, currentTarget.x, currentTarget.y, 'lightning'));
                                 
                                 lastHitPosition = { x: currentTarget.x, y: currentTarget.y };
-                                damage *= 0.75;
+                                damage *= 0.75; // Damage falloff for subsequent bounces
 
                                 let nextTarget = null;
                                 let minDistance = Infinity;
@@ -669,7 +669,7 @@
                     if (enemiesHitCount > 0) {
                         playSound('cleaveHit');
                         if (this.type === 'large-melee' || this.type === 'berserker') {
-                           triggerScreenShake();
+                            triggerScreenShake();
                         }
                     }
                 }
@@ -694,7 +694,7 @@
                 this.color = type === 'elite' ? '#991b1b' : '#ef4444';
                 this.maxHealth = this.health;
                 this.target = null;
-                this.detectionRange = gameState.cellSize * 8;
+                this.detectionRange = gameState.cellSize * 8; // 적의 탐지 범위
                 this.attackRange = this.radius * 1.5;
                 this.fireRate = 90;
                 this.fireCooldown = 0;
@@ -704,10 +704,10 @@
                 this.stunDuration = 0;
             }
             applySlow(duration) {
-                if (!this.isSlowed) {
+                if (!this.isSlowed) { // Prevent re-slowing if already slowed
                     this.isSlowed = true;
                     this.slowDuration = duration;
-                    this.speed *= 0.5;
+                    this.speed *= 0.5; // Slow to 50% speed
                 }
             }
             applyStun(duration) {
@@ -745,13 +745,13 @@
                     if (this.stunDuration <= 0) {
                         this.isStunned = false;
                     }
-                    return;
+                    return; // Skip all other logic if stunned
                 }
                 if (this.slowDuration > 0) {
                     this.slowDuration--;
                     if (this.slowDuration <= 0) {
                         this.isSlowed = false;
-                        this.speed = this.originalSpeed;
+                        this.speed = this.originalSpeed; // Restore speed
                     }
                 }
                 if (this.fireCooldown > 0) this.fireCooldown--;
@@ -827,7 +827,7 @@
                         }
                         triggerScreenShake();
                         playSound('cleaveHit');
-                        return true;
+                        return true; // Remove projectile
                     }
                     return false;
                 }
@@ -841,7 +841,7 @@
                     playSound('hit');
 
                     if (this.special === 'slow') {
-                        this.target.applySlow(120);
+                        this.target.applySlow(120); // Slow for 2 seconds (120 frames)
                     }
                     return true;
                 }
@@ -922,6 +922,7 @@
                     ctx.lineWidth = 2;
                     ctx.beginPath();
                     ctx.moveTo(this.startX, this.startY);
+                    // Create jagged line for lightning effect
                     const dx = this.endX - this.startX;
                     const dy = this.endY - this.startY;
                     const segments = 10;
@@ -1016,25 +1017,41 @@
                         }
                         gameState.enemies.push(new Enemy(wave, enemyType));
                         gameState.enemiesLeftInGroup--;
-                        gameState.intraGroupSpawnTimer = 10;
+                        gameState.intraGroupSpawnTimer = 10; // 그룹 내 적 스폰 간격
                     } else {
                         gameState.groupsToSpawn--;
                         if (gameState.groupsToSpawn > 0) {
                             gameState.enemiesLeftInGroup = gameState.enemiesPerGroup;
-                            gameState.groupSpawnTimer = 180;
+                            gameState.groupSpawnTimer = 180; // 그룹 간 스폰 간격
                         }
                     }
                 }
             }
             
-            gameState.towers.forEach(tower => {
+            gameState.towers = gameState.towers.filter(tower => {
                 if (!gameState.isMovingUnit || tower !== gameState.selectedUnitForAction) {
                     tower.update();
                 }
-                tower.draw();
-            });
-            gameState.towers = gameState.towers.filter(tower => tower.currentHealth > 0);
 
+                if (tower.currentHealth <= 0) {
+                    // Clear grid position
+                    if (tower.isStatic || !tower.hasMoved) {
+                        for (let i = tower.row; i < tower.row + tower.size; i++) {
+                            for (let j = tower.col; j < tower.col + tower.size; j++) {
+                                if (i < gameState.gridRows && j < gameState.gridCols && gameState.grid[i][j] === tower) {
+                                    gameState.grid[i][j] = null;
+                                }
+                            }
+                        }
+                    }
+                    return false; // Remove the tower
+                }
+                
+                if (!gameState.isMovingUnit || tower !== gameState.selectedUnitForAction) {
+                    tower.draw();
+                }
+                return true; // Keep the tower
+            });
 
             const baseBoundary = gameState.baseCols * gameState.cellSize;
             gameState.enemies = gameState.enemies.filter(e => {
@@ -1325,6 +1342,7 @@
                 addResources(-cost);
                 gameState.upgradeLevels[type]++;
                 
+                // 즉시 효과 적용 (체력)
                 if (type === 'baseHealth') {
                     updateHealth(upgradeData.baseHealth.effect);
                 }
@@ -1342,7 +1360,7 @@
                 return;
             }
             gameState.activityPending = type;
-            gameState.activityCountdown = 5 * 60;
+            gameState.activityCountdown = 5 * 60; // 5초 카운트다운
             updateGameControlsState();
         }
 
@@ -1447,6 +1465,22 @@
             }
         }
 
+        // [새로 추가됨] 탭 UI를 제어하는 함수
+        function switchTab(tabName) {
+            // 모든 탭 버튼 스타일 초기화
+            Object.values(ui.tabs).forEach(tab => {
+                tab.classList.remove('border-cyan-400', 'text-cyan-400');
+                tab.classList.add('border-transparent', 'text-gray-400');
+            });
+            // 모든 패널 숨기기
+            Object.values(ui.panels).forEach(panel => panel.classList.add('hidden'));
+
+            // 선택된 탭과 패널 활성화
+            ui.tabs[tabName].classList.add('border-cyan-400', 'text-cyan-400');
+            ui.tabs[tabName].classList.remove('border-transparent', 'text-gray-400');
+            ui.panels[tabName].classList.remove('hidden');
+        }
+
         function setupEventListeners() {
             canvas.addEventListener('mousemove', e => {
                 const rect = canvas.getBoundingClientRect();
@@ -1479,9 +1513,11 @@
                 const clickX = e.clientX - rect.left;
                 const clickY = e.clientY - rect.top;
 
+                // If moving a unit, place it
                 if (gameState.isMovingUnit) {
                     const { r, c } = gameState.hoveredCell;
                     if (canPlaceTower(r, c, gameState.selectedUnitForAction.size)) {
+                        // Clear old grid position
                         for (let i = gameState.selectedUnitForAction.row; i < gameState.selectedUnitForAction.row + gameState.selectedUnitForAction.size; i++) {
                             for (let j = gameState.selectedUnitForAction.col; j < gameState.selectedUnitForAction.col + gameState.selectedUnitForAction.size; j++) {
                                 if (i < gameState.gridRows && j < gameState.gridCols) {
@@ -1489,6 +1525,7 @@
                                 }
                             }
                         }
+                        // Set new position
                         gameState.selectedUnitForAction.row = r;
                         gameState.selectedUnitForAction.col = c;
                         gameState.selectedUnitForAction.x = (c + gameState.selectedUnitForAction.size / 2) * gameState.cellSize;
@@ -1496,6 +1533,7 @@
                         gameState.selectedUnitForAction.originalX = gameState.selectedUnitForAction.x;
                         gameState.selectedUnitForAction.originalY = gameState.selectedUnitForAction.y;
                         
+                        // Occupy new grid position
                         for (let i = r; i < r + gameState.selectedUnitForAction.size; i++) {
                             for (let j = c; j < c + gameState.selectedUnitForAction.size; j++) {
                                 gameState.grid[i][j] = gameState.selectedUnitForAction;
@@ -1521,7 +1559,7 @@
                 if (clickedTower) {
                     gameState.selectedUnitForAction = clickedTower;
                     ui.unitActionMenu.style.left = `${clickX}px`;
-                    ui.unitActionMenu.style.top = `${clickY - 60}px`;
+                    ui.unitActionMenu.style.top = `${clickY - 60}px`; // Position above the tower
                     ui.unitActionMenu.classList.remove('hidden');
                 } else {
                     ui.unitActionMenu.classList.add('hidden');
@@ -1548,6 +1586,7 @@
                     ui.unitActionMenu.classList.add('hidden');
                 }
             });
+
 
             ui.startButton.addEventListener('click', () => {
                 ui.startModal.style.display = 'none';
@@ -1677,6 +1716,11 @@
                 ui.activityButtons[key].addEventListener('click', () => startActivity(key));
             });
             
+            // [새로 추가됨] 탭 전환 이벤트 리스너
+            ui.tabs.shop.addEventListener('click', () => switchTab('shop'));
+            ui.tabs.research.addEventListener('click', () => switchTab('research'));
+            ui.tabs.activity.addEventListener('click', () => switchTab('activity'));
+
             window.addEventListener('resize', () => {
                 clearTimeout(window.resizedFinished);
                 window.resizedFinished = setTimeout(() => {
