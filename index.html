@@ -182,17 +182,17 @@
                          <button data-activity="study" class="activity-button flex flex-col items-center p-2 bg-slate-800 rounded-lg border border-slate-600 disabled:bg-slate-700 disabled:cursor-not-allowed">
                             <span class="text-3xl">📚</span>
                             <span class="font-bold">공부 (<span id="study-count">0</span>)</span>
-                            <span class="text-xs text-slate-400">10초</span>
+                            <span class="text-xs text-slate-400">25분</span>
                         </button>
                         <button data-activity="exercise" class="activity-button flex flex-col items-center p-2 bg-slate-800 rounded-lg border border-slate-600 disabled:bg-slate-700 disabled:cursor-not-allowed">
                             <span class="text-3xl">🏋️</span>
                             <span class="font-bold">운동 (<span id="exercise-count">0</span>)</span>
-                            <span class="text-xs text-slate-400">10초</span>
+                            <span class="text-xs text-slate-400">25분</span>
                         </button>
                         <button data-activity="reading" class="activity-button flex flex-col items-center p-2 bg-slate-800 rounded-lg border border-slate-600 disabled:bg-slate-700 disabled:cursor-not-allowed">
                             <span class="text-3xl">📖</span>
                             <span class="font-bold">독서 (<span id="reading-count">0</span>)</span>
-                            <span class="text-xs text-slate-400">10초</span>
+                            <span class="text-xs text-slate-400">25분</span>
                         </button>
                     </div>
                     <button id="give-up-activity-button" class="hidden w-full mt-2 bg-red-800 hover:bg-red-700 rounded-lg p-3 font-bold transition-colors">
@@ -310,7 +310,7 @@ const TOWER_DATA = {
     library: { name: '도서관', icon: '🏛️', costs: [80], damages: [0], ranges: [0], fireRates: [0], income: 5, incomeRate: 120, unlockActivity: 'reading', unlocked: false, description: '2초마다 5💰를 생성합니다.' }
 };
 const ACTIVITY_DATA = {
-    duration: 10 * 60, // 10초 (600 프레임)
+    duration: 25 * 60 * 60, // 10초 (600 프레임)
     preCountdownDuration: 5 * 60, // 5초
 };
 
@@ -336,7 +336,7 @@ function init() {
     // 게임 상태 리셋
     gameState = {
         health: 20,
-        resources: 150,
+        resources: 130,
         wave: 0,
         totalWaves: 10,
         towers: [],
