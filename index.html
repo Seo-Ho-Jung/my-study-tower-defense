@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>제미나이 디펜스</title>
+    <title>자기계발 타워 디펜스</title>
+    <meta name="theme-color" content="#0c1427"/>
+    <link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,7 +18,7 @@
             overflow: hidden;
             background-color: #0c1427;
         }
-        /* 커스텀 스크롤바 (필요시) */
+        /* 커스텀 스크롤바 */
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: #1e293b; }
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 2px; }
@@ -25,10 +27,7 @@
             background: rgba(0, 0, 0, 0.4);
             backdrop-filter: blur(5px);
             border: 1px solid rgba(100, 116, 139, 0.5);
-        }
-        .tower-slot.highlight {
-             box-shadow: 0 0 20px #facc15;
-             border-radius: 50%;
+            transition: background-color 0.2s;
         }
         .tower-button.selected {
             background-color: #0e7490;
@@ -39,31 +38,22 @@
             color: #06b6d4;
             border-color: #06b6d4;
         }
-        .tower-button.locked .lock-overlay {
-            display: flex;
-        }
-        .tower-button:not(.locked) .lock-overlay {
-            display: none;
-        }
-        .tower-button .tooltip {
-            display: none;
-            pointer-events: none; /* 툴팁이 마우스 이벤트를 가로채지 않도록 설정 */
-        }
-        .tower-button:hover .tooltip {
-            display: block;
-        }
+        .tower-button.locked .lock-overlay { display: flex; }
+        .tower-button:not(.locked) .lock-overlay { display: none; }
 
-        @keyframes pulse {
-            0% { transform: translate(-50%, -50%) scale(1); opacity: 0.7; }
-            70% { transform: translate(-50%, -50%) scale(1.4); opacity: 0; }
-            100% { transform: translate(-50%, -50%) scale(1.4); opacity: 0; }
-        }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        .fade-in {
-            animation: fadeIn 0.5s ease-out forwards;
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        
+        @keyframes hurt-effect {
+            0% { background-color: rgba(0, 0, 0, 0.4); transform: scale(1); }
+            50% { background-color: rgba(220, 38, 38, 0.5); transform: scale(1.1); }
+            100% { background-color: rgba(0, 0, 0, 0.4); transform: scale(1); }
+        }
+        .hurt {
+            animation: hurt-effect 0.3s ease-out;
         }
     </style>
 </head>
@@ -74,17 +64,17 @@
 
         <!-- 상단 HUD -->
         <div id="hud" class="grid grid-cols-3 gap-2 p-2 text-center">
-            <div class="hud-item rounded-lg p-2">
-                <span class="text-2xl">❤️</span>
-                <span id="health" class="text-xl font-bold">20</span>
+            <div id="health-hud" class="hud-item rounded-lg p-2">
+                <span class="text-xl">❤️</span>
+                <span id="health" class="text-lg font-bold">100</span>
             </div>
             <div class="hud-item rounded-lg p-2">
-                <span class="text-2xl">💰</span>
-                <span id="resources" class="text-xl font-bold">150</span>
+                <span class="text-xl">💰</span>
+                <span id="resources" class="text-lg font-bold">150</span>
             </div>
             <div class="hud-item rounded-lg p-2">
-                <span class="text-2xl">🌊</span>
-                <span id="wave" class="text-xl font-bold">0 / 10</span>
+                <span class="text-xl">🌊</span>
+                <span id="wave-info" class="text-lg font-bold">R1 0/10</span>
             </div>
         </div>
         
@@ -101,74 +91,24 @@
                 <button data-tab="activity" class="tab-button flex-1 pb-2 text-lg font-bold border-b-2 border-transparent text-slate-400 transition-colors">활동</button>
             </div>
             
-            <!-- 탭 패널 (고정 높이 적용) -->
-            <div id="tab-panels" class="relative h-40">
+            <!-- 탭 패널 -->
+            <div id="tab-panels" class="relative min-h-40">
                 <!-- 건설/관리 패널 -->
                 <div id="panel-build" class="tab-panel absolute inset-0 overflow-y-auto">
-                    <!-- 타워 선택 UI -->
                     <div id="tower-selection-ui">
-                        <p class="text-center text-sm text-slate-400 mb-2">건설할 타워를 선택하세요</p>
-                        <div id="tower-buttons" class="grid grid-cols-4 gap-2">
-                            <!-- 기본 타워 -->
-                            <button data-tower-type="archer" class="tower-button flex flex-col items-center p-2 bg-slate-800 rounded-lg border border-slate-600 transition-all duration-200 relative">
-                                <span class="text-3xl">🏹</span>
-                                <span class="font-bold text-sm">궁수</span>
-                                <span class="text-yellow-400 text-sm">20💰</span>
-                                <div class="tooltip hidden absolute bottom-full mb-2 w-max px-2 py-1 bg-gray-800 text-white text-xs rounded z-10"></div>
-                            </button>
-                            <button data-tower-type="barracks" class="tower-button flex flex-col items-center p-2 bg-slate-800 rounded-lg border border-slate-600 transition-all duration-200 relative">
-                                <span class="text-3xl">🛡️</span>
-                                <span class="font-bold text-sm">병영</span>
-                                <span class="text-yellow-400 text-sm">20💰</span>
-                                <div class="tooltip hidden absolute bottom-full mb-2 w-max px-2 py-1 bg-gray-800 text-white text-xs rounded z-10"></div>
-                            </button>
-                            <button data-tower-type="mage" class="tower-button flex flex-col items-center p-2 bg-slate-800 rounded-lg border border-slate-600 transition-all duration-200 relative">
-                                <span class="text-3xl">🧙</span>
-                                <span class="font-bold text-sm">마법사</span>
-                                <span class="text-yellow-400 text-sm">50💰</span>
-                                <div class="tooltip hidden absolute bottom-full mb-2 w-max px-2 py-1 bg-gray-800 text-white text-xs rounded z-10"></div>
-                            </button>
-                             <button data-tower-type="cannon" class="tower-button flex flex-col items-center p-2 bg-slate-800 rounded-lg border border-slate-600 transition-all duration-200 relative">
-                                <span class="text-3xl">💣</span>
-                                <span class="font-bold text-sm">대포</span>
-                                <span class="text-yellow-400 text-sm">70💰</span>
-                                <div class="tooltip hidden absolute bottom-full mb-2 w-max px-2 py-1 bg-gray-800 text-white text-xs rounded z-10"></div>
-                            </button>
-                            <!-- 해금 타워 -->
-                            <button data-tower-type="laboratory" class="tower-button locked flex flex-col items-center p-2 bg-slate-900 rounded-lg border border-slate-700 transition-all duration-200 relative">
-                                <span class="text-3xl opacity-30">🔬</span>
-                                <span class="font-bold text-sm text-slate-500">연구소</span>
-                                <span class="text-yellow-400 text-sm">100💰</span>
-                                <div class="lock-overlay absolute inset-0 flex items-center justify-center bg-black bg-opacity-60 rounded-lg"><span class="text-2xl">🔒</span></div>
-                                <div class="tooltip hidden absolute bottom-full mb-2 w-max px-2 py-1 bg-gray-800 text-white text-xs rounded z-10"></div>
-                            </button>
-                            <button data-tower-type="trainingCamp" class="tower-button locked flex flex-col items-center p-2 bg-slate-900 rounded-lg border border-slate-700 transition-all duration-200 relative">
-                                <span class="text-3xl opacity-30">💪</span>
-                                <span class="font-bold text-sm text-slate-500">훈련소</span>
-                                <span class="text-yellow-400 text-sm">120💰</span>
-                                <div class="lock-overlay absolute inset-0 flex items-center justify-center bg-black bg-opacity-60 rounded-lg"><span class="text-2xl">🔒</span></div>
-                                <div class="tooltip hidden absolute bottom-full mb-2 w-max px-2 py-1 bg-gray-800 text-white text-xs rounded z-10"></div>
-                            </button>
-                            <button data-tower-type="library" class="tower-button locked flex flex-col items-center p-2 bg-slate-900 rounded-lg border border-slate-700 transition-all duration-200 relative">
-                                <span class="text-3xl opacity-30">🏛️</span>
-                                <span class="font-bold text-sm text-slate-500">도서관</span>
-                                <span class="text-yellow-400 text-sm">80💰</span>
-                                <div class="lock-overlay absolute inset-0 flex items-center justify-center bg-black bg-opacity-60 rounded-lg"><span class="text-2xl">🔒</span></div>
-                                <div class="tooltip hidden absolute bottom-full mb-2 w-max px-2 py-1 bg-gray-800 text-white text-xs rounded z-10"></div>
-                            </button>
+                        <div id="tower-buttons" class="grid grid-cols-3 gap-2">
+                            <!-- JS로 동적 생성 -->
                         </div>
                     </div>
-
-                    <!-- 타워 관리 UI (초기에는 숨김) -->
                     <div id="tower-management-ui" class="hidden">
-                        <div class="flex items-center gap-2">
-                            <div id="selected-tower-info" class="flex-1 text-center">
+                        <div id="management-buttons-container" class="grid grid-cols-3 gap-2">
+                            <div id="selected-tower-info" class="col-span-3 text-center mb-2">
                                 <p id="selected-tower-name" class="text-lg font-bold">타워 이름</p>
                                 <p id="selected-tower-level" class="text-sm text-slate-400">레벨 1</p>
                                 <p id="selected-tower-description" class="text-xs text-cyan-300 mt-1"></p>
                             </div>
-                            <button id="move-button" class="bg-green-700 hover:bg-green-600 rounded-lg p-3 font-bold transition-colors">이동</button>
-                            <button id="upgrade-button" class="flex-1 bg-blue-600 hover:bg-blue-500 rounded-lg p-3 text-lg font-bold transition-colors">업글</button>
+                            <button id="upgrade-button" class="bg-blue-600 hover:bg-blue-500 rounded-lg p-3 font-bold transition-colors">업글</button>
+                            <button id="skill-button" class="bg-purple-600 hover:bg-purple-500 rounded-lg p-3 font-bold transition-colors hidden">스킬</button>
                             <button id="sell-button" class="bg-red-700 hover:bg-red-600 rounded-lg p-3 font-bold transition-colors">판매</button>
                         </div>
                         <button id="close-management-ui" class="w-full mt-2 bg-slate-700 hover:bg-slate-600 rounded-lg p-2 text-sm">닫기</button>
@@ -177,112 +117,211 @@
                 
                 <!-- 활동 패널 -->
                 <div id="panel-activity" class="tab-panel absolute inset-0 hidden">
-                    <p class="text-center text-sm text-slate-400 mb-2">활동을 시작하여 100💰을 즉시 얻으세요</p>
+                    <p class="text-center text-sm text-slate-400 mb-2">활동을 완료하여 보상을 얻고 유닛을 해금하세요.</p>
                     <div id="activity-buttons-container" class="grid grid-cols-3 gap-2">
                          <button data-activity="study" class="activity-button flex flex-col items-center p-2 bg-slate-800 rounded-lg border border-slate-600 disabled:bg-slate-700 disabled:cursor-not-allowed">
                             <span class="text-3xl">📚</span>
                             <span class="font-bold">공부 (<span id="study-count">0</span>)</span>
-                            <span class="text-xs text-slate-400">25분</span>
+                            <span class="text-xs text-slate-400">10초</span>
                         </button>
                         <button data-activity="exercise" class="activity-button flex flex-col items-center p-2 bg-slate-800 rounded-lg border border-slate-600 disabled:bg-slate-700 disabled:cursor-not-allowed">
                             <span class="text-3xl">🏋️</span>
                             <span class="font-bold">운동 (<span id="exercise-count">0</span>)</span>
-                            <span class="text-xs text-slate-400">25분</span>
+                            <span class="text-xs text-slate-400">10초</span>
                         </button>
-                        <button data-activity="reading" class="activity-button flex flex-col items-center p-2 bg-slate-800 rounded-lg border border-slate-600 disabled:bg-slate-700 disabled:cursor-not-allowed">
+                        <button data-activity="read" class="activity-button flex flex-col items-center p-2 bg-slate-800 rounded-lg border border-slate-600 disabled:bg-slate-700 disabled:cursor-not-allowed">
                             <span class="text-3xl">📖</span>
-                            <span class="font-bold">독서 (<span id="reading-count">0</span>)</span>
-                            <span class="text-xs text-slate-400">25분</span>
+                            <span class="font-bold">독서 (<span id="read-count">0</span>)</span>
+                            <span class="text-xs text-slate-400">10초</span>
                         </button>
                     </div>
-                    <button id="give-up-activity-button" class="hidden w-full mt-2 bg-red-800 hover:bg-red-700 rounded-lg p-3 font-bold transition-colors">
-                        활동 포기 (-100💰)
-                    </button>
+                    <button id="give-up-activity-button" class="hidden w-full mt-2 bg-red-800 hover:bg-red-700 rounded-lg p-3 font-bold transition-colors">활동 포기</button>
                 </div>
             </div>
             
             <!-- 하단 고정 버튼 -->
             <div class="mt-2 grid grid-cols-1 gap-2">
-                <button id="start-wave-button" class="w-full bg-green-600 hover:bg-green-500 rounded-lg p-4 text-xl font-bold transition-colors disabled:bg-slate-600 disabled:cursor-not-allowed">
+                <button id="start-wave-button" class="w-full bg-green-600 hover:bg-green-500 rounded-lg p-3 text-xl font-bold transition-colors disabled:bg-slate-600 disabled:cursor-not-allowed">
                     웨이브 시작
                 </button>
-                <div class="grid grid-cols-2 gap-2">
-                    <button id="pause-button" class="w-full p-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-bold flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
-                    </button>
-                    <button id="give-up-button" class="w-full p-3 bg-red-800 hover:bg-red-700 rounded-lg font-bold disabled:bg-slate-600 disabled:cursor-not-allowed" disabled>웨이브 재시도</button>
+                <div class="grid grid-cols-2 gap-2 mt-2">
+                    <button id="retry-wave-button" class="w-full p-2 bg-yellow-600 hover:bg-yellow-500 rounded-lg font-bold disabled:bg-slate-600 disabled:cursor-not-allowed">웨이브 재도전</button>
+                    <button id="restart-game-button" class="w-full p-2 bg-red-800 hover:bg-red-700 rounded-lg font-bold">재시작</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 모달 -->
+        <div id="modal" class="absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
+            <div id="modal-content" class="bg-[#16223b] p-8 rounded-2xl shadow-lg text-center border-2 border-slate-600 max-w-sm w-full fade-in">
+                <h2 id="modal-title" class="text-4xl font-bold mb-4 text-cyan-400">자기계발 디펜스</h2>
+                <p id="modal-text" class="text-slate-300 mb-6">다가오는 적들로부터 코어를 지켜내세요! 활동으로 타워를 해금하고, 건설하여 승리하세요.</p>
+                <button id="modal-button" class="w-full bg-cyan-600 hover:bg-cyan-500 rounded-lg p-4 text-xl font-bold transition-colors">게임 시작</button>
+            </div>
+        </div>
+
+        <!-- 확인 모달 -->
+        <div id="confirm-modal" class="hidden absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
+            <div class="bg-[#16223b] p-8 rounded-2xl shadow-lg text-center border-2 border-slate-600 max-w-sm w-full fade-in">
+                <h2 id="confirm-title" class="text-2xl font-bold mb-4 text-yellow-400">확인</h2>
+                <p id="confirm-text" class="text-slate-300 mb-6"></p>
+                <div class="flex gap-4">
+                    <button id="confirm-yes-button" class="flex-1 bg-red-700 hover:bg-red-600 rounded-lg p-3 font-bold transition-colors">예</button>
+                    <button id="confirm-no-button" class="flex-1 bg-slate-600 hover:bg-slate-500 rounded-lg p-3 font-bold transition-colors">아니오</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 모달 -->
-    <div id="modal" class="absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
-        <div id="modal-content" class="bg-[#16223b] p-8 rounded-2xl shadow-lg text-center border-2 border-slate-600 max-w-sm w-full fade-in">
-            <h2 id="modal-title" class="text-4xl font-bold mb-4 text-cyan-400">제미나이 디펜스</h2>
-            <p id="modal-text" class="text-slate-300 mb-6">다가오는 적들로부터 코어를 지켜내세요! 타워를 건설하고 업그레이드하여 승리하세요.</p>
-            <button id="modal-button" class="w-full bg-cyan-600 hover:bg-cyan-500 rounded-lg p-4 text-xl font-bold transition-colors">게임 시작</button>
-        </div>
-    </div>
-    
-    <!-- 일시정지 모달 -->
-    <div id="pause-modal" class="hidden absolute inset-0 bg-black bg-opacity-70 flex-col items-center justify-center p-4 z-40">
-        <h2 class="text-6xl font-bold text-cyan-400 animate-pulse">일시정지</h2>
-        <p class="mt-4 text-slate-300">화면을 터치하여 계속하기</p>
-    </div>
-
-    <!-- 확인 모달 -->
-    <div id="confirm-modal" class="hidden absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
-        <div class="bg-[#16223b] p-8 rounded-2xl shadow-lg text-center border-2 border-slate-600 max-w-sm w-full fade-in">
-            <h2 id="confirm-title" class="text-2xl font-bold mb-4 text-yellow-400">확인</h2>
-            <p id="confirm-text" class="text-slate-300 mb-6"></p>
-            <div class="flex gap-4">
-                <button id="confirm-yes-button" class="flex-1 bg-red-700 hover:bg-red-600 rounded-lg p-3 font-bold transition-colors">예</button>
-                <button id="confirm-no-button" class="flex-1 bg-slate-600 hover:bg-slate-500 rounded-lg p-3 font-bold transition-colors">아니오</button>
-            </div>
-        </div>
-    </div>
-
-<script>
+<script type="module">
 // ==================================
-// 초기 설정 및 전역 변수
+// 게임 설정 (GameConfig.js)
+// ==================================
+const GameConfig = {
+    // 라운드별 맵 설정
+    maps: [
+        { // Round 1
+            path: [{x:0.5,y:0},{x:0.5,y:0.2},{x:0.8,y:0.2},{x:0.8,y:0.4},{x:0.2,y:0.4},{x:0.2,y:0.6},{x:0.8,y:0.6},{x:0.8,y:0.8},{x:0.5,y:0.8},{x:0.5,y:1}],
+            slots: [{x:0.25,y:0.1},{x:0.75,y:0.1},{x:0.65,y:0.3},{x:0.95,y:0.3},{x:0.5,y:0.5},{x:0.05,y:0.5},{x:0.35,y:0.5},{x:0.65,y:0.9}]
+        },
+        { // Round 2
+            path: [{x:0,y:0.5},{x:0.2,y:0.5},{x:0.2,y:0.2},{x:0.8,y:0.2},{x:0.8,y:0.8},{x:0.2,y:0.8},{x:0.2,y:0.5},{x:1,y:0.5}],
+            slots: [{x:0.1,y:0.1},{x:0.4,y:0.1},{x:0.7,y:0.1},{x:0.1,y:0.35},{x:0.4,y:0.35},{x:0.7,y:0.35},{x:0.1,y:0.65},{x:0.4,y:0.65},{x:0.7,y:0.65}]
+        },
+        { // Round 3: Zigzag Canyon
+            path: [{x:0.1,y:0},{x:0.1,y:0.2},{x:0.9,y:0.2},{x:0.9,y:0.4},{x:0.1,y:0.4},{x:0.1,y:0.6},{x:0.9,y:0.6},{x:0.9,y:0.8},{x:0.1,y:0.8},{x:0.1,y:1}],
+            slots: [{x:0.5,y:0.1},{x:0.3,y:0.3},{x:0.7,y:0.3},{x:0.3,y:0.5},{x:0.7,y:0.5},{x:0.3,y:0.7},{x:0.7,y:0.7},{x:0.5,y:0.9}]
+        },
+        { // Round 4: Spiral Path
+            path: [{x:0.5,y:0},{x:0.5,y:0.9},{x:0.1,y:0.9},{x:0.1,y:0.1},{x:0.9,y:0.1},{x:0.9,y:0.9},{x:0.5,y:0.9},{x:0.5,y:1}],
+            slots: [{x:0.3,y:0.3},{x:0.7,y:0.3},{x:0.3,y:0.5},{x:0.5,y:0.5},{x:0.7,y:0.5},{x:0.3,y:0.7},{x:0.7,y:0.7}]
+        },
+        { // Round 5: Forked Road
+            path: [{x:0.5,y:0},{x:0.5,y:0.2},{x:0.2,y:0.4},{x:0.2,y:0.6},{x:0.5,y:0.8},{x:0.5,y:1}],
+            path2: [{x:0.5,y:0},{x:0.5,y:0.2},{x:0.8,y:0.4},{x:0.8,y:0.6},{x:0.5,y:0.8},{x:0.5,y:1}],
+            slots: [{x:0.5,y:0.1},{x:0.2,y:0.25},{x:0.8,y:0.25},{x:0.5,y:0.35},{x:0.2,y:0.7},{x:0.8,y:0.7},{x:0.5,y:0.9}]
+        }
+    ],
+
+    // 타워 데이터
+    towers: {
+        archer: { name: '궁수', icon: '🏹', costs: [20, 30, 45, 65, 90], damages: [6, 10, 15, 22, 30], ranges: [120, 125, 130, 135, 140], fireRates: [30, 28, 26, 24, 22], projectileType: 'arrow', description: '단일 적에게 빠른 화살을 발사합니다.', shortDesc: '단일 공격', unlocked: true },
+        barracks: { name: '병영', icon: '🛡️', costs: [30, 45, 65, 90, 120], spawnRates: [400, 380, 360, 340, 320], maxSoldiers: [1, 1, 2, 2, 3], soldierHealth: [80, 110, 150, 200, 260], soldierDamage: [4, 7, 11, 16, 22], description: '경로를 막는 병사를 생성합니다.', shortDesc: '길목 방어', unlocked: true },
+        ice: { name: '얼음', icon: '❄️', costs: [40, 55, 75, 100, 130], damages: [4, 6, 9, 13, 18], ranges: [100, 105, 110, 115, 120], fireRates: [90, 85, 80, 75, 70], projectileType: 'ice', effect: { type: 'slow', power: 0.5, duration: 120 }, description: '적을 2초간 50% 느리게 만듭니다.', shortDesc: '감속 효과', unlocked: true },
+        
+        // 활동 1회 해금 (광역)
+        poisonSprayer: { name: '독구름 살포기', icon: '☠️', costs: [100, 130, 170, 220, 280], damages: [2.8, 4, 6.4, 8.8, 12.8], ranges: [100, 105, 110, 115, 120], fireRates: [120, 115, 110, 105, 100], projectileType: 'poison_bomb', description: '지속 피해를 주는 독구름 지역을 생성합니다.', shortDesc: '지속 독피해', unlockActivity: 'study', unlockCount: 1, unlocked: false },
+        flamethrower: { name: '화염 방사탑', icon: '🔥', costs: [100, 130, 170, 220, 280], damages: [1, 1.5, 2, 2.8, 4], ranges: [80, 85, 90, 95, 100], fireRates: [5, 5, 5, 4, 4], attackAngle: Math.PI / 4, description: '부채꼴 범위에 지속적인 화염 피해를 줍니다.', shortDesc: '광역 화염', unlockActivity: 'exercise', unlockCount: 1, unlocked: false },
+        holyBomber: { name: '신성한 폭격기', icon: '✨', costs: [100, 130, 170, 220, 280], damages: [26, 36, 50, 68, 90], ranges: [150, 155, 160, 165, 170], fireRates: [180, 170, 160, 150, 140], projectileType: 'holy_bomb', description: '체력이 높은 적에게 추가 피해를 주는 포탄을 떨어트립니다.', shortDesc: '탱크/보스 킬러', unlockActivity: 'read', unlockCount: 1, unlocked: false },
+
+        // 활동 2회 해금 (전문 버프/디버프)
+        laboratory: { name: '연구소', icon: '🔬', costs: [120], ranges: [100], effect: { type: 'damage_buff', value: 1.5 }, description: '주변 타워 공격력 +50%', shortDesc: '공격력 버프', unlockActivity: 'study', unlockCount: 2, unlocked: false },
+        warDrums: { name: '전장의 북', icon: '🥁', costs: [120], ranges: [0], description: '액티브: 모든 병사 공속 +100%', shortDesc: '병사 공속', skill: { cost: 50, cooldown: 1800, duration: 480, effect: 'attack_speed_boost' }, unlockActivity: 'exercise', unlockCount: 2, unlocked: false },
+        weaknessAnalyzer: { name: '약점 분석기', icon: '👁️', costs: [120], ranges: [100], effect: { type: 'debuff', value: 1.3 }, description: '주변 적이 받는 피해량 +30%', shortDesc: '피해 증폭', unlockActivity: 'read', unlockCount: 2, unlocked: false },
+    },
+    
+    // 적 데이터
+    enemies: {
+        basic: { hp: 55, speed: 1.0, reward: 2, radius: 8, color: '#f87171', damage: 1 },
+        fast: { hp: 30, speed: 1.8, reward: 3, radius: 7, color: '#fde047', damage: 1 },
+        tank: { hp: 250, speed: 0.6, reward: 5, radius: 12, color: '#a1a1aa', damage: 2 },
+        summonerBoss: { hp: 1000, speed: 0.7, reward: 100, radius: 20, color: '#a855f7', special: 'summon', summonCooldown: 600, summonType: 'fast', summonCount: 3, damage: 18 },
+        juggernautBoss: { hp: 2100, speed: 0.6, reward: 150, radius: 22, color: '#7f1d1d', special: 'stun', stunCooldown: 480, stunRange: 120, stunDuration: 180, ignoresBlockers: true, damage: 18 },
+        chaosLordBoss: { hp: 5000, speed: 0.5, reward: 500, radius: 25, color: '#4a044e', special: 'all', summonCooldown: 500, summonType: 'fast', summonCount: 4, stunCooldown: 400, stunRange: 130, stunDuration: 120, ignoresBlockers: true, damage: 18 },
+    },
+    
+    // 웨이브 구성
+    waveCompositionsByRound: [
+        { // Round 1
+            waves: [
+                [['basic', 15, 50]], [['basic', 20, 45]], [['basic', 10, 40], ['fast', 5, 80]],
+                [['fast', 15, 40]], [['basic', 15, 30], ['tank', 2, 200]], [['tank', 5, 120]],
+                [['fast', 20, 30], ['tank', 3, 150]], [['basic', 20, 20], ['fast', 10, 40]],
+                [['tank', 8, 100], ['fast', 10, 50]], [['summonerBoss', 1, 1]]
+            ]
+        },
+        { // Round 2
+            waves: [
+                [['basic', 25, 35]], [['fast', 20, 25]], [['basic', 15, 30], ['tank', 3, 150]],
+                [['tank', 8, 100]], [['fast', 25, 20]], [['basic', 20, 20], ['tank', 5, 120]],
+                [['tank', 10, 80], ['fast', 10, 40]], [['fast', 30, 15]],
+                [['basic', 20, 20], ['tank', 8, 100]], [['juggernautBoss', 1, 1]]
+            ]
+        },
+        { // Round 3
+            waves: [
+                [['tank', 12, 90]], [['fast', 35, 18]], [['basic', 20, 20], ['tank', 8, 100]],
+                [['tank', 12, 80], ['fast', 15, 30]], [['fast', 40, 15]],
+                [['basic', 30, 15], ['tank', 10, 90]], [['tank', 15, 70]],
+                [['fast', 20, 20], ['basic', 20, 20]], [['tank', 10, 60], ['fast', 20, 25]],
+                [['summonerBoss', 2, 120]] // Enhanced boss
+            ]
+        },
+        { // Round 4
+            waves: [
+                [['basic', 60, 9]], [['tank', 18, 55]], [['fast', 50, 10]],
+                [['tank', 10, 50], ['fast', 20, 20]], [['basic', 40, 10], ['tank', 10, 50]],
+                [['fast', 60, 10]], [['tank', 20, 40]],
+                [['fast', 30, 15], ['tank', 10, 50]], [['basic', 50, 10]],
+                [['juggernautBoss', 2, 120]] // Enhanced boss
+            ]
+        },
+        { // Round 5
+            waves: [
+                [['tank', 25, 45]], [['fast', 70, 9]], [['basic', 40, 10], ['tank', 10, 50]],
+                [['tank', 15, 40], ['fast', 30, 15]], [['fast', 70, 8]],
+                [['tank', 25, 40]], [['basic', 30, 10], ['fast', 30, 10]],
+                [['tank', 20, 40], ['fast', 20, 20]], [['basic', 60, 8]],
+                [['chaosLordBoss', 1, 1]] // Final Boss
+            ]
+        }
+    ],
+
+    // 활동 데이터
+    activities: {
+        study: { name: '공부', duration: 10 * 60, reward: 100 },
+        exercise: { name: '운동', duration: 10 * 60, reward: 100 },
+        read: { name: '독서', duration: 10 * 60, reward: 100 },
+    }
+};
+
+// ==================================
+// 전역 변수 및 UI 요소
 // ==================================
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-
-// UI 요소
 const ui = {
     health: document.getElementById('health'),
+    healthHud: document.getElementById('health-hud'),
     resources: document.getElementById('resources'),
-    wave: document.getElementById('wave'),
-    towerButtons: document.querySelectorAll('.tower-button'),
+    waveInfo: document.getElementById('wave-info'),
+    towerButtonsContainer: document.getElementById('tower-buttons'),
     towerSelectionUI: document.getElementById('tower-selection-ui'),
     towerManagementUI: document.getElementById('tower-management-ui'),
+    managementButtonsContainer: document.getElementById('management-buttons-container'),
     selectedTowerName: document.getElementById('selected-tower-name'),
     selectedTowerLevel: document.getElementById('selected-tower-level'),
     selectedTowerDescription: document.getElementById('selected-tower-description'),
     upgradeButton: document.getElementById('upgrade-button'),
     sellButton: document.getElementById('sell-button'),
-    moveButton: document.getElementById('move-button'),
+    skillButton: document.getElementById('skill-button'),
     closeManagementUI: document.getElementById('close-management-ui'),
     startWaveButton: document.getElementById('start-wave-button'),
+    retryWaveButton: document.getElementById('retry-wave-button'),
+    restartGameButton: document.getElementById('restart-game-button'),
     tabButtons: document.querySelectorAll('.tab-button'),
     tabPanels: document.querySelectorAll('.tab-panel'),
     activityButtons: document.querySelectorAll('.activity-button'),
-    activityButtonsContainer: document.getElementById('activity-buttons-container'),
     giveUpActivityButton: document.getElementById('give-up-activity-button'),
-    giveUpButton: document.getElementById('give-up-button'),
     activityCounts: {
         study: document.getElementById('study-count'),
         exercise: document.getElementById('exercise-count'),
-        reading: document.getElementById('reading-count'),
+        read: document.getElementById('read-count'),
     },
     modal: document.getElementById('modal'),
     modalTitle: document.getElementById('modal-title'),
     modalText: document.getElementById('modal-text'),
     modalButton: document.getElementById('modal-button'),
-    pauseButton: document.getElementById('pause-button'),
-    pauseModal: document.getElementById('pause-modal'),
     confirmModal: document.getElementById('confirm-modal'),
     confirmTitle: document.getElementById('confirm-title'),
     confirmText: document.getElementById('confirm-text'),
@@ -290,295 +329,46 @@ const ui = {
     confirmNoButton: document.getElementById('confirm-no-button'),
 };
 
-// 게임 상태 객체
 let gameState = {};
-let confirmAction = null;
-
-// 사운드 신스
 let synth, hitSynth;
+let confirmAction = null;
 let lastSoundTime = 0;
-const soundOffset = 0.001;
-
-// 게임 데이터
-const TOWER_DATA = {
-    archer: { name: '궁수 타워', icon: '🏹', costs: [20, 40, 70], damages: [8, 12, 18], ranges: [120, 130, 140], fireRates: [30, 27, 24], projectileType: 'arrow', description: '단일 적에게 빠른 화살을 발사합니다.' },
-    barracks: { name: '병영', icon: '🛡️', costs: [20, 40, 70], spawnRates: [400, 350, 300], maxSoldiers: [1, 2, 3], soldierHealth: [60, 80, 110], soldierDamage: [5, 8, 12], description: '경로를 막는 병사를 생성합니다.' },
-    mage: { name: '마법사 길드', icon: '🧙', costs: [50, 80, 120], damages: [25, 40, 60], ranges: [100, 105, 110], fireRates: [90, 85, 80], projectileType: 'magic', description: '강력한 마법 구체를 발사합니다.' },
-    cannon: { name: '대포', icon: '💣', costs: [70, 110, 160], damages: [20, 30, 45], ranges: [90, 95, 100], fireRates: [120, 110, 100], splashRadius: [30, 35, 40], projectileType: 'cannonball', description: '범위 피해를 주는 포탄을 발사합니다.' },
-    laboratory: { name: '연구소', icon: '🔬', costs: [100], damages: [0], ranges: [80], fireRates: [0], unlockActivity: 'study', unlocked: false, buff: { type: 'damage', value: 1.10 }, description: '주변 타워 공격력 +10%' },
-    trainingCamp: { name: '훈련소', icon: '💪', costs: [120], damages: [0], ranges: [80], fireRates: [0], unlockActivity: 'exercise', unlocked: false, buff: { type: 'health', value: 1.20 }, description: '주변 병영 병사 체력 +20%' },
-    library: { name: '도서관', icon: '🏛️', costs: [80], damages: [0], ranges: [0], fireRates: [0], income: 5, incomeRate: 120, unlockActivity: 'reading', unlocked: false, description: '2초마다 5💰를 생성합니다.' }
-};
-const ACTIVITY_DATA = {
-    duration: 25 * 60 * 60, // 10초 (600 프레임)
-    preCountdownDuration: 5 * 60, // 5초
-};
-
-// ==================================
-// 게임 초기화 함수
-// ==================================
-function init() {
-    // 기존 게임 루프 및 타임아웃 정리
-    if (gameState.timeoutIds) {
-        gameState.timeoutIds.forEach(id => clearTimeout(id));
-    }
-    if (gameState.animationFrameId) {
-        cancelAnimationFrame(gameState.animationFrameId);
-    }
-
-    // 해금 타워 리셋
-    for (const type in TOWER_DATA) {
-        if (TOWER_DATA[type].unlockActivity) {
-            TOWER_DATA[type].unlocked = false;
-        }
-    }
-
-    // 게임 상태 리셋
-    gameState = {
-        health: 20,
-        resources: 130,
-        wave: 0,
-        totalWaves: 10,
-        towers: [],
-        enemies: [],
-        projectiles: [],
-        particles: [],
-        soldiers: [],
-        towerSlots: [],
-        enemyPath: [],
-        selectedTowerType: 'archer',
-        selectedTower: null,
-        waveInProgress: false,
-        spawningComplete: false,
-        gameOver: false,
-        gameWon: false,
-        isPaused: false,
-        animationFrameId: null,
-        isMovingTower: false,
-        towerToMove: null,
-        activityInProgress: null,
-        activityTimer: 0,
-        activityPending: null,
-        activityPreCountdown: 0,
-        completedActivities: { study: 0, exercise: 0, reading: 0 },
-        mousePos: { x: 0, y: 0 },
-        preWaveState: null,
-        timeoutIds: [],
-        notification: null,
-    };
-
-    // 컨테이너 기반 캔버스 크기 설정
-    const container = document.getElementById('canvas-container');
-    canvas.width = container.offsetWidth;
-    canvas.height = container.offsetHeight;
-
-    // 캔버스 크기에 따른 적 경로 정의
-    const pathPoints = [
-        { x: 0.5, y: 0 }, { x: 0.5, y: 0.2 }, { x: 0.8, y: 0.2 }, { x: 0.8, y: 0.4 },
-        { x: 0.2, y: 0.4 }, { x: 0.2, y: 0.6 }, { x: 0.8, y: 0.6 }, { x: 0.8, y: 0.8 },
-        { x: 0.5, y: 0.8 }, { x: 0.5, y: 1.0 }
-    ];
-    gameState.enemyPath = pathPoints.map(p => ({ x: p.x * canvas.width, y: p.y * canvas.height }));
-
-    // 캔버스 크기에 따른 타워 슬롯 위치 정의
-    const slotPoints = [
-        { x: 0.25, y: 0.1 }, { x: 0.75, y: 0.1 }, 
-        { x: 0.65, y: 0.3 }, { x: 0.95, y: 0.3 },
-        { x: 0.5, y: 0.5 },
-        { x: 0.05, y: 0.5 }, { x: 0.35, y: 0.5 },
-        { x: 0.5, y: 0.7 },
-        { x: 0.95, y: 0.7 },
-        { x: 0.65, y: 0.9 }
-    ];
-    gameState.towerSlots = slotPoints.map(p => ({ x: p.x * canvas.width, y: p.y * canvas.height, tower: null }));
-    
-    // UI 업데이트 및 게임 루프 시작
-    updateUI();
-    updateTowerButtonsUI();
-    selectTowerType('archer');
-    showTowerSelectionUI();
-    updateDynamicButtons();
-    updateActivityCountUI();
-    
-    gameLoop();
-}
-
-// ==================================
-// 게임 루프 및 렌더링
-// ==================================
-function gameLoop() {
-    if (gameState.gameOver) return;
-    
-    gameState.animationFrameId = requestAnimationFrame(gameLoop);
-    
-    if (gameState.isPaused) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    drawPath();
-    drawTowerSlots();
-    
-    if (gameState.activityPreCountdown > 0) {
-        gameState.activityPreCountdown--;
-        drawPreActivityCountdown();
-        if (gameState.activityPreCountdown <= 0) {
-            gameState.resources += 100;
-            updateUI();
-            gameState.activityInProgress = gameState.activityPending;
-            gameState.activityPending = null;
-            gameState.activityTimer = ACTIVITY_DATA.duration;
-        }
-    } else if (gameState.activityInProgress) {
-        gameState.activityTimer--;
-        if (gameState.activityTimer <= 0) {
-            completeActivity();
-        }
-    }
-
-    // 객체 업데이트
-    gameState.towers.forEach(t => t.update());
-    gameState.soldiers.forEach(s => s.update());
-    gameState.enemies.forEach(e => e.update());
-    gameState.projectiles.forEach(p => p.update());
-    gameState.particles.forEach(p => p.update());
-
-    // 객체 그리기
-    gameState.towers.forEach(t => t.draw());
-    gameState.soldiers.forEach(s => s.draw());
-    gameState.enemies.forEach(e => e.draw());
-    gameState.projectiles.forEach(p => p.draw());
-    gameState.particles.forEach(p => p.draw());
-
-    // UI 그리기
-    if (gameState.isMovingTower && gameState.towerToMove) drawMovingTower();
-    if (gameState.activityInProgress) drawActivityTimer();
-    if (gameState.notification && gameState.notification.timer > 0) {
-        gameState.notification.timer--;
-        drawNotification();
-    } else {
-        gameState.notification = null;
-    }
-
-    // 비활성 객체 필터링
-    gameState.enemies = gameState.enemies.filter(e => e.active);
-    gameState.projectiles = gameState.projectiles.filter(p => p.active);
-    gameState.particles = gameState.particles.filter(p => p.active);
-    gameState.soldiers = gameState.soldiers.filter(s => s.active);
-
-    // 웨이브 종료 조건 확인
-    if (gameState.waveInProgress && gameState.spawningComplete && gameState.enemies.length === 0) {
-        endWave();
-    }
-}
-
-function drawPath() {
-    ctx.strokeStyle = 'rgba(100, 116, 139, 0.4)';
-    ctx.lineWidth = 30; // 길목 너비 증가
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(gameState.enemyPath[0].x, gameState.enemyPath[0].y);
-    for (let i = 1; i < gameState.enemyPath.length; i++) {
-        ctx.lineTo(gameState.enemyPath[i].x, gameState.enemyPath[i].y);
-    }
-    ctx.stroke();
-}
-
-function drawTowerSlots() {
-    gameState.towerSlots.forEach((slot) => {
-        const isHighlighted = gameState.isMovingTower && !slot.tower;
-        ctx.fillStyle = slot.tower ? 'rgba(56, 189, 248, 0.1)' : 'rgba(255, 255, 255, 0.05)';
-        ctx.strokeStyle = isHighlighted ? '#facc15' : 'rgba(100, 116, 139, 0.7)';
-        ctx.lineWidth = isHighlighted ? 3 : 2;
-        ctx.beginPath();
-        ctx.arc(slot.x, slot.y, 20, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-    });
-}
-
-function drawMovingTower() {
-    const tower = gameState.towerToMove;
-    const data = TOWER_DATA[tower.type];
-    ctx.globalAlpha = 0.7;
-    ctx.font = '24px Jua';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(data.icon, gameState.mousePos.x, gameState.mousePos.y);
-    ctx.globalAlpha = 1;
-}
-
-function drawActivityTimer() {
-    const progress = 1 - (gameState.activityTimer / ACTIVITY_DATA.duration);
-    const barWidth = canvas.width * 0.8;
-    const barX = (canvas.width - barWidth) / 2;
-    
-    ctx.fillStyle = "rgba(0,0,0,0.5)";
-    ctx.fillRect(barX, 20, barWidth, 30);
-    
-    ctx.fillStyle = "#22c55e";
-    ctx.fillRect(barX, 20, barWidth * progress, 30);
-    
-    const totalSeconds = Math.ceil(gameState.activityTimer / 60);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    const timeString = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-
-    ctx.fillStyle = "white";
-    ctx.font = "16px Jua";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(`${gameState.activityInProgress.toUpperCase()} 중... ${timeString}`, canvas.width / 2, 35);
-}
-
-function drawPreActivityCountdown() {
-    const seconds = Math.ceil(gameState.activityPreCountdown / 60);
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    ctx.fillStyle = 'white';
-    ctx.textAlign = 'center';
-    
-    ctx.font = '80px Jua';
-    ctx.fillText(seconds, canvas.width / 2, canvas.height / 2 - 40);
-    
-    ctx.font = '20px Jua';
-    ctx.fillText("5초간 숨을 고르고, 바로 시작하세요!", canvas.width / 2, canvas.height / 2 + 40);
-}
-
-function drawNotification() {
-    if (!gameState.notification) return;
-    const alpha = Math.min(1, gameState.notification.timer / 60); // 마지막 1초 동안 사라짐
-    ctx.save();
-    ctx.textAlign = 'center';
-    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
-    ctx.font = '18px Jua';
-    ctx.shadowColor = 'black';
-    ctx.shadowBlur = 5;
-    ctx.fillText(gameState.notification.message, canvas.width / 2, 30);
-    ctx.restore();
-}
-
 
 // ==================================
 // 클래스 정의
 // ==================================
 class Soldier {
-    constructor(tower, rallyPoint, initialHealth) {
+    constructor(tower) {
         this.tower = tower;
-        this.x = rallyPoint.x;
-        this.y = rallyPoint.y;
-        this.health = initialHealth;
-        this.maxHealth = initialHealth;
-        this.damage = TOWER_DATA.barracks.soldierDamage[tower.level];
+        this.rallyPoint = tower.rallyPoint;
+        this.x = this.rallyPoint.x + (Math.random() - 0.5) * 10;
+        this.y = this.rallyPoint.y + (Math.random() - 0.5) * 10;
+        
+        const data = GameConfig.towers.barracks;
+        this.health = data.soldierHealth[tower.level];
+        this.maxHealth = this.health;
+        this.damage = data.soldierDamage[tower.level];
+        
         this.attackRange = 40;
         this.attackCooldown = 0;
-        this.attackRate = 60; // 1초에 한 번 공격
+        this.attackRate = 60;
         this.target = null;
         this.active = true;
+        this.effects = [];
     }
 
     update() {
         if (!this.active || gameState.isPaused) return;
+        
+        this.effects.forEach((effect, index) => {
+            effect.duration--;
+            if (effect.duration <= 0) this.effects.splice(index, 1);
+        });
+
+        let currentAttackRate = this.attackRate;
+        if (this.effects.find(e => e.type === 'attack_speed_boost')) {
+            currentAttackRate /= 2; // 100% faster
+        }
 
         this.attackCooldown--;
         if (!this.target || !this.target.active || getDistance(this, this.target) > this.attackRange) {
@@ -587,8 +377,7 @@ class Soldier {
 
         if (this.target && this.attackCooldown <= 0) {
             this.target.takeDamage(this.damage);
-            gameState.particles.push(new Particle(this.target.x, this.target.y, '#ffffff', 1));
-            this.attackCooldown = this.attackRate;
+            this.attackCooldown = currentAttackRate;
         }
     }
 
@@ -596,6 +385,7 @@ class Soldier {
         this.target = null;
         let closestDist = this.attackRange;
         for (const enemy of gameState.enemies) {
+            if (!enemy.active) continue;
             const dist = getDistance(this, enemy);
             if (dist < closestDist) {
                 closestDist = dist;
@@ -605,7 +395,7 @@ class Soldier {
     }
 
     draw() {
-        ctx.fillStyle = '#a1a1aa';
+        ctx.fillStyle = this.effects.find(e => e.type === 'attack_speed_boost') ? '#f97316' : '#a1a1aa';
         ctx.beginPath();
         ctx.arc(this.x, this.y, 8, 0, Math.PI * 2);
         ctx.fill();
@@ -625,94 +415,162 @@ class Soldier {
         if (this.health <= 0) {
             this.active = false;
             const index = this.tower.soldiers.indexOf(this);
-            if (index > -1) {
-                this.tower.soldiers.splice(index, 1);
-            }
+            if (index > -1) this.tower.soldiers.splice(index, 1);
         }
+    }
+    
+    applyEffect(effect) {
+        const existing = this.effects.find(e => e.type === effect.type);
+        if (existing) existing.duration = Math.max(existing.duration, effect.duration);
+        else this.effects.push({ ...effect });
     }
 }
 
 class Enemy {
-    constructor(wave, isUnique = false) {
+    constructor(type, round, spawnOffset = {x: 0, y: 0}) {
         this.path = gameState.enemyPath;
         this.pathIndex = 0;
-        this.x = this.path[0].x;
-        this.y = this.path[0].y;
-        this.isUnique = isUnique;
-
-        if (this.isUnique) {
-            this.radius = 10;
-            this.speed = 0.7 + wave * 0.1;
-            this.health = 100 + wave * 30;
-            this.resourceValue = 2; // 유니크 유닛 처치 시 자원 2 획득
-            this.damage = 10 + wave * 2;
-        } else {
-            this.radius = 7 + Math.random() * 3;
-            this.speed = 0.5 + wave * 0.1 + Math.random() * 0.2;
-            this.health = 20 + wave * 12;
-            this.resourceValue = 1; // 일반 유닛 처치 시 자원 1 획득
-            this.damage = 5 + wave;
-        }
+        const startPoint = this.path[0];
+        this.x = startPoint.x + spawnOffset.x;
+        this.y = startPoint.y + spawnOffset.y;
         
-        this.maxHealth = this.health;
+        const data = GameConfig.enemies[type];
+        this.type = type;
+        this.hp = data.hp * (1 + (round - 1) * 0.5);
+        this.maxHp = this.hp;
+        this.speed = data.speed;
+        this.reward = data.reward;
+        this.radius = data.radius;
+        this.color = data.color;
+        this.damage = data.damage || 1;
         this.active = true;
-        this.slowed = false;
-        this.slowTimer = 0;
+        this.effects = [];
         this.blockingSoldier = null;
         this.attackCooldown = 0;
         this.attackRate = 60;
+        
+        // Boss specific properties
+        this.special = data.special;
+        if (this.special === 'summon' || this.special === 'all') {
+            this.summonCooldown = data.summonCooldown;
+            this.summonTimer = this.summonCooldown;
+            this.summonType = data.summonType;
+            this.summonCount = data.summonCount;
+        }
+        if (this.special === 'stun' || this.special === 'all') {
+            this.stunCooldown = data.stunCooldown;
+            this.stunTimer = this.stunCooldown;
+            this.stunRange = data.stunRange;
+            this.stunDuration = data.stunDuration;
+        }
+        this.ignoresBlockers = data.ignoresBlockers || false;
     }
-
     update() {
         if (!this.active || gameState.isPaused) return;
-        if (gameState.activityInProgress || gameState.activityPreCountdown > 0) return;
 
+        this.effects.forEach((effect, index) => {
+            effect.duration--;
+            if (effect.duration <= 0) this.effects.splice(index, 1);
+        });
+        
         this.attackCooldown--;
 
         if (this.blockingSoldier && !this.blockingSoldier.active) {
             this.blockingSoldier = null;
         }
-        if (!this.blockingSoldier) {
+
+        if (!this.blockingSoldier && !this.ignoresBlockers) {
             this.findBlockingSoldier();
         }
 
-        if (this.blockingSoldier) {
+        if (this.blockingSoldier && !this.ignoresBlockers) {
             if (this.attackCooldown <= 0) {
-                this.blockingSoldier.takeDamage(this.damage);
+                this.blockingSoldier.takeDamage(10);
                 this.attackCooldown = this.attackRate;
             }
-            return; 
+        } else {
+            // Separation logic only when moving
+            let separation = { x: 0, y: 0 };
+            let count = 0;
+            for (const other of gameState.enemies) {
+                if (other === this) continue;
+                const dist = getDistance(this, other);
+                const combinedRadius = this.radius + other.radius;
+                if (dist < combinedRadius && dist > 0) {
+                    const diff = { x: this.x - other.x, y: this.y - other.y };
+                    separation.x += diff.x / dist;
+                    separation.y += diff.y / dist;
+                    count++;
+                }
+            }
+            if (count > 0) {
+                this.x += (separation.x / count) * 0.5;
+                this.y += (separation.y / count) * 0.5;
+            }
+
+            let currentSpeed = this.speed;
+            if (this.effects.find(e => e.type === 'slow')) {
+                currentSpeed *= (1 - GameConfig.towers.ice.effect.power);
+            }
+
+            if (this.pathIndex < this.path.length - 1) {
+                const target = this.path[this.pathIndex + 1];
+                const dx = target.x - this.x;
+                const dy = target.y - this.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist < currentSpeed) {
+                    this.x = target.x;
+                    this.y = target.y;
+                    this.pathIndex++;
+                } else {
+                    this.x += (dx / dist) * currentSpeed;
+                    this.y += (dy / dist) * currentSpeed;
+                }
+            } else {
+                this.active = false;
+                takeDamageToCore(this.damage);
+            }
+        }
+        
+        // Boss abilities
+        if (this.special === 'summon' || this.special === 'all') {
+            this.summonTimer--;
+            if (this.summonTimer <= 0) {
+                for (let i = 0; i < this.summonCount; i++) {
+                    const offsetAngle = (i / this.summonCount) * Math.PI * 2;
+                    const spawnOffset = { x: this.x + Math.cos(offsetAngle) * 30, y: this.y + Math.sin(offsetAngle) * 30 };
+                    gameState.enemies.push(new Enemy(this.summonType, gameState.currentRound, spawnOffset));
+                }
+                this.summonTimer = this.hp < this.maxHp / 2 ? this.summonCooldown / 2 : this.summonCooldown;
+            }
+        }
+        if (this.special === 'stun' || this.special === 'all') {
+            this.stunTimer--;
+            if (this.stunTimer <= 0) {
+                gameState.towers.forEach(tower => {
+                    if (getDistance(this, tower) <= this.stunRange) {
+                        tower.stun(this.stunDuration);
+                    }
+                });
+                this.stunTimer = this.stunCooldown;
+            }
         }
 
-        const currentSpeed = this.slowed ? this.speed * 0.5 : this.speed;
-        if (this.slowed) { this.slowTimer--; if (this.slowTimer <= 0) this.slowed = false; }
-
-        if (this.pathIndex < this.path.length - 1) {
-            const target = this.path[this.pathIndex + 1];
-            const dx = target.x - this.x;
-            const dy = target.y - this.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < currentSpeed) { this.pathIndex++; } 
-            else { this.x += (dx / dist) * currentSpeed; this.y += (dy / dist) * currentSpeed; }
-        } else {
-            this.active = false;
-            if (this.isUnique) {
-                gameState.health -= 2; // 유니크 유닛은 체력 2 감소
-            } else {
-                gameState.health--;
-            }
-            updateUI();
-            if (gameState.health <= 0) {
-                gameOver(false);
-            }
+        // Constrain enemy to path
+        const closestPathPoint = findClosestPathPoint(this.x, this.y);
+        const distFromPath = getDistance(this, closestPathPoint);
+        const pathWidth = 15; // Half of the path width
+        if (distFromPath > pathWidth) {
+            const angleToPath = Math.atan2(closestPathPoint.y - this.y, closestPathPoint.x - this.x);
+            this.x += Math.cos(angleToPath) * (distFromPath - pathWidth);
+            this.y += Math.sin(angleToPath) * (distFromPath - pathWidth);
         }
     }
-    
+
     findBlockingSoldier() {
         let closestDist = 25; 
         for (const soldier of gameState.soldiers) {
-            const dist = getDistance(this, soldier);
-            if (dist < closestDist) {
+            if (getDistance(this, soldier) < closestDist) {
                 this.blockingSoldier = soldier;
                 break;
             }
@@ -720,40 +578,66 @@ class Enemy {
     }
 
     draw() {
-        if (this.isUnique) {
-            ctx.fillStyle = '#a855f7';
-            ctx.strokeStyle = '#f0abfc';
-            ctx.lineWidth = 3;
-        } else {
-            ctx.fillStyle = this.slowed ? '#60a5fa' : '#f87171';
-            ctx.strokeStyle = '#fca5a5';
-            ctx.lineWidth = 1;
+        ctx.save();
+        let isDebuffed = false;
+        for (const tower of gameState.towers) {
+            if (tower.type === 'weaknessAnalyzer' && getDistance(this, tower) <= tower.range) {
+                isDebuffed = true;
+                break;
+            }
         }
 
+        if (isDebuffed) {
+            ctx.shadowColor = "magenta";
+            ctx.shadowBlur = 15;
+        }
+
+        ctx.fillStyle = this.color;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         ctx.fill();
-        if (this.isUnique) ctx.stroke();
+        ctx.restore();
+
+        if (this.effects.find(e => e.type === 'slow')) {
+            ctx.fillStyle = 'rgba(103, 232, 249, 0.5)';
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius * 1.2, 0, Math.PI * 2);
+            ctx.fill();
+        }
         
+        if (this.effects.find(e => e.type === 'poison')) {
+            ctx.fillStyle = 'rgba(132, 204, 22, 0.5)';
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
         const healthBarWidth = 25;
         ctx.fillStyle = '#3f3f46';
         ctx.fillRect(this.x - healthBarWidth / 2, this.y - this.radius - 8, healthBarWidth, 4);
         ctx.fillStyle = '#10b981';
-        ctx.fillRect(this.x - healthBarWidth / 2, this.y - this.radius - 8, healthBarWidth * (this.health / this.maxHealth), 4);
+        ctx.fillRect(this.x - healthBarWidth / 2, this.y - this.radius - 8, healthBarWidth * (this.hp / this.maxHp), 4);
     }
+    takeDamage(amount, effect = null) {
+        let finalDamage = amount;
+        for (const tower of gameState.towers) {
+            if (tower.type === 'weaknessAnalyzer' && getDistance(this, tower) <= tower.range) {
+                finalDamage *= tower.effect.value;
+                break;
+            }
+        }
 
-    takeDamage(amount) {
-        this.health -= amount;
-        if (this.health <= 0) {
+        this.hp -= finalDamage;
+        if (this.hp <= 0) {
             this.active = false;
-            gameState.resources += this.resourceValue;
+            gameState.resources += this.reward;
             updateUI();
         }
-    }
-
-    applySlow(duration) {
-        this.slowed = true;
-        this.slowTimer = duration;
+        if (effect) {
+            const existing = this.effects.find(e => e.type === effect.type);
+            if (existing) existing.duration = Math.max(existing.duration, effect.duration);
+            else this.effects.push({ ...effect });
+        }
     }
 }
 
@@ -766,78 +650,106 @@ class Tower {
         this.level = 0;
         this.target = null;
         this.fireCooldown = 0;
+        this.skillCooldown = 0;
+        this.direction = 0; // for flamethrower
+        this.isStunned = false;
+        this.stunTimer = 0;
+        this.effects = [];
         this.setStats();
 
         if (this.type === 'barracks') {
             this.soldiers = [];
             this.spawnCooldown = 0;
-            this.rallyPoint = findClosestPathPoint(this.x, this.y, 0);
-        } else if (this.type === 'library') {
-            this.incomeCooldown = this.incomeRate;
+            this.rallyPoint = findClosestPathPoint(this.x, this.y);
         }
     }
-
     setStats() {
-        const data = TOWER_DATA[this.type];
+        const data = GameConfig.towers[this.type];
         this.cost = data.costs[this.level];
         this.damage = data.damages ? data.damages[this.level] : 0;
         this.range = data.ranges ? data.ranges[this.level] : 0;
         this.fireRate = data.fireRates ? data.fireRates[this.level] : 0;
-        if (data.splashRadius) this.splashRadius = data.splashRadius[this.level];
         if (data.spawnRates) {
             this.spawnRate = data.spawnRates[this.level];
             this.maxSoldiers = data.maxSoldiers[this.level];
+            this.soldierHealth = data.soldierHealth[this.level];
+            this.soldierDamage = data.soldierDamage[this.level];
         }
-        if (data.incomeRate) this.incomeRate = data.incomeRate;
-        if (data.income) this.income = data.income;
+        if (data.effect) this.effect = data.effect;
+        if (data.attackAngle) this.attackAngle = data.attackAngle;
+        if (data.skill) this.skill = data.skill;
     }
-
     update() {
-        if (gameState.isMovingTower && gameState.towerToMove === this) return;
-        if (gameState.activityInProgress || gameState.activityPreCountdown > 0 || gameState.isPaused) return;
+        if (gameState.isPaused) return;
+        
+        this.effects.forEach((effect, index) => {
+            effect.duration--;
+            if (effect.duration <= 0) this.effects.splice(index, 1);
+        });
+        
+        if (this.isStunned) {
+            this.stunTimer--;
+            if (this.stunTimer <= 0) this.isStunned = false;
+            return;
+        }
+        
+        if(this.skillCooldown > 0) this.skillCooldown--;
 
         if (this.type === 'barracks') {
             this.spawnCooldown--;
             if (this.spawnCooldown <= 0 && this.soldiers.length < this.maxSoldiers) {
-                let finalHealth = TOWER_DATA.barracks.soldierHealth[this.level];
-                gameState.towers.forEach(t => {
-                    if (t.type === 'trainingCamp' && getDistance(this, t) <= t.range) {
-                        finalHealth *= t.buff.value;
-                    }
-                });
-                const rallyX = this.rallyPoint.x + (Math.random() - 0.5) * 15;
-                const rallyY = this.rallyPoint.y + (Math.random() - 0.5) * 15;
-                const newSoldier = new Soldier(this, { x: rallyX, y: rallyY }, finalHealth);
+                const newSoldier = new Soldier(this);
                 this.soldiers.push(newSoldier);
                 gameState.soldiers.push(newSoldier);
                 this.spawnCooldown = this.spawnRate;
             }
-        } else if (this.type === 'library') {
-            this.incomeCooldown--;
-            if (this.incomeCooldown <= 0) {
-                gameState.resources += this.income;
-                updateUI();
-                gameState.particles.push(new Particle(this.x, this.y, '#facc15', 2));
-                this.incomeCooldown = this.incomeRate;
+            return;
+        }
+        
+        if (this.type === 'laboratory' || this.type === 'weaknessAnalyzer' || this.type === 'warDrums') {
+            return; // Passive or skill-only towers
+        }
+
+        this.fireCooldown--;
+        if (this.target && (!this.target.active || getDistance(this, this.target) > this.getRange())) {
+            this.target = null;
+        }
+        if (!this.target) {
+            this.findTarget();
+        }
+        
+        if (this.target) {
+            this.direction = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+
+            let currentFireRate = this.fireRate;
+            if (this.effects.find(e => e.type === 'attack_speed_boost')) {
+                currentFireRate /= 2;
             }
-        } else if (this.type === 'laboratory' || this.type === 'trainingCamp') {
-            // Aura towers are passive, no update needed here
-        } else {
-            this.fireCooldown--;
+
             if (this.fireCooldown <= 0) {
-                this.findTarget();
-                if (this.target) {
-                    this.fire();
-                    this.fireCooldown = this.fireRate;
-                }
+                this.fire();
+                this.fireCooldown = currentFireRate;
             }
         }
     }
+    
+    getDamage() {
+        let currentDamage = this.damage;
+        gameState.towers.forEach(tower => {
+            if (tower.type === 'laboratory' && getDistance(this, tower) <= tower.range + 20) {
+                currentDamage *= tower.effect.value;
+            }
+        });
+        return currentDamage;
+    }
 
+    getRange() { return this.range; }
+    
     findTarget() {
         this.target = null;
-        let closestDist = this.range;
+        let closestDist = this.getRange();
         for (const enemy of gameState.enemies) {
+            if (!enemy.active) continue;
             const dist = getDistance(this, enemy);
             if (dist < closestDist) {
                 closestDist = dist;
@@ -845,38 +757,104 @@ class Tower {
             }
         }
     }
-
+    
     fire() {
         if (!this.target) return;
-        let finalDamage = this.damage;
-        gameState.towers.forEach(t => {
-            if (t.type === 'laboratory' && getDistance(this, t) <= t.range) {
-                finalDamage *= t.buff.value;
+        const data = GameConfig.towers[this.type];
+        
+        if (this.type === 'flamethrower') {
+            for(let i = 0; i < 5; i++) {
+                gameState.particles.push(new Particle(this.x, this.y, 'flame', this.direction, this.attackAngle));
             }
-        });
-
-        const data = TOWER_DATA[this.type];
-        gameState.projectiles.push(new Projectile(this, this.target, finalDamage, data.projectileType, this.splashRadius));
-        playSound('shoot');
+            gameState.enemies.forEach(enemy => {
+                if (getDistance(this, enemy) < this.range) {
+                    const angleToEnemy = Math.atan2(enemy.y - this.y, enemy.x - this.x);
+                    let angleDiff = Math.abs(this.direction - angleToEnemy);
+                    if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+                    if (angleDiff < this.attackAngle / 2) {
+                        enemy.takeDamage(this.getDamage());
+                    }
+                }
+            });
+        } else {
+            gameState.projectiles.push(new Projectile(this, this.target, this.getDamage(), data.projectileType, this.effect));
+        }
+        
+        if (this.type !== 'flamethrower') {
+            playSound('shoot');
+        }
     }
     
+    activateSkill() {
+        if (!this.skill || this.skillCooldown > 0 || gameState.resources < this.skill.cost) {
+            playSound('error');
+            return;
+        }
+        gameState.resources -= this.skill.cost;
+        this.skillCooldown = this.skill.cooldown;
+        playSound('upgrade');
+
+        if (this.skill.effect === 'attack_speed_boost') {
+            gameState.soldiers.forEach(soldier => {
+                soldier.applyEffect({ type: 'attack_speed_boost', duration: this.skill.duration });
+            });
+            gameState.towers.forEach(tower => {
+                if (tower.damage > 0 || tower.type === 'flamethrower') {
+                    tower.applyEffect({ type: 'attack_speed_boost', duration: this.skill.duration });
+                }
+            });
+        }
+        showTowerManagementUI(this);
+    }
+
+    stun(duration) {
+        this.isStunned = true;
+        this.stunTimer = duration;
+    }
+
+    applyEffect(effect) {
+        const existing = this.effects.find(e => e.type === effect.type);
+        if (existing) existing.duration = Math.max(existing.duration, effect.duration);
+        else this.effects.push({ ...effect });
+    }
+
     draw() {
-        if (gameState.isMovingTower && gameState.towerToMove === this) return;
-        const data = TOWER_DATA[this.type];
+        const data = GameConfig.towers[this.type];
+        ctx.save();
+        if (this.isStunned) {
+            ctx.globalAlpha = 0.5;
+        }
+        
+        if (this.effects.find(e => e.type === 'attack_speed_boost')) {
+            ctx.fillStyle = 'rgba(249, 115, 22, 0.25)'; // Orange aura
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, 25, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Draw buff aura for Laboratory
+        if (this.type !== 'laboratory' && this.type !== 'barracks' && this.type !== 'warDrums' && this.type !== 'weaknessAnalyzer') {
+            for (const tower of gameState.towers) {
+                if (tower.type === 'laboratory' && getDistance(this, tower) <= tower.range + 20) {
+                    ctx.fillStyle = 'rgba(253, 224, 71, 0.2)';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, 25, 0, Math.PI * 2);
+                    ctx.fill();
+                    break;
+                }
+            }
+        }
+
         ctx.font = '24px Jua';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(data.icon, this.x, this.y);
+        ctx.restore();
+
         ctx.fillStyle = 'white';
         ctx.font = '10px Jua';
         ctx.fillText(`Lv.${this.level + 1}`, this.x, this.y + 15);
-        if (gameState.selectedTower === this && this.range > 0) {
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, this.range, 0, Math.PI * 2);
-            ctx.stroke();
-        }
+
         if (this.type === 'barracks' && this.rallyPoint) {
             ctx.strokeStyle = '#a1a1aa';
             ctx.lineWidth = 1;
@@ -886,29 +864,45 @@ class Tower {
             ctx.stroke();
             ctx.strokeRect(this.rallyPoint.x - 5, this.rallyPoint.y - 5, 10, 10);
         }
-    }
 
+        if (gameState.selectedTower === this && this.range > 0) {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.range, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        
+        if (this.isStunned) {
+            ctx.fillStyle = 'yellow';
+            ctx.font = '12px Jua';
+            ctx.fillText('⚡', this.x, this.y - 15);
+        }
+    }
     upgrade() {
-        const data = TOWER_DATA[this.type];
-        if (this.level < data.costs.length - 1) {
-            const upgradeCost = data.costs[this.level + 1];
-            if (gameState.resources >= upgradeCost) {
-                gameState.resources -= upgradeCost;
-                this.level++;
-                this.setStats();
-                playSound('upgrade');
-                return true;
+        const data = GameConfig.towers[this.type];
+        if (data.damages || data.spawnRates) { // Only allow upgrades for towers with scaling stats
+            if (this.level < data.costs.length - 1) {
+                const upgradeCost = data.costs[this.level + 1];
+                if (gameState.resources >= upgradeCost) {
+                    gameState.resources -= upgradeCost;
+                    this.level++;
+                    this.setStats();
+                    playSound('upgrade');
+                    return true;
+                }
             }
         }
         return false;
     }
-
     sell() {
         let totalCost = 0;
-        for (let i = 0; i <= this.level; i++) { totalCost += TOWER_DATA[this.type].costs[i]; }
+        for (let i = 0; i <= this.level; i++) {
+            totalCost += GameConfig.towers[this.type].costs[i];
+        }
         gameState.resources += totalCost;
         this.slot.tower = null;
-        if (this.type === 'barracks') {
+        if(this.type === 'barracks'){
             this.soldiers.forEach(s => s.active = false);
         }
         gameState.towers = gameState.towers.filter(t => t !== this);
@@ -917,70 +911,95 @@ class Tower {
 }
 
 class Projectile {
-    constructor(source, target, damage, type = 'normal', splashRadius = 0) {
-        this.x = source.x; this.y = source.y; this.target = target;
-        this.damage = damage; this.speed = 5; this.radius = 3;
-        this.active = true; this.type = type; this.splashRadius = splashRadius;
+    constructor(source, target, damage, type, effect = null) {
+        this.x = source.x;
+        this.y = source.y;
+        this.target = target;
+        this.damage = damage;
+        this.type = type;
+        this.effect = effect;
+        this.speed = 5;
+        this.active = true;
+        
+        if(this.type === 'holy_bomb') {
+            this.targetPos = {x: target.x, y: target.y};
+        }
     }
-    
     update() {
-        if (!this.active || !this.target.active || gameState.activityInProgress || gameState.activityPreCountdown > 0 || gameState.isPaused) {
-            if (!this.target.active) this.active = false;
+        if (!this.active || gameState.isPaused) return;
+
+        let targetX, targetY;
+        if (this.type === 'holy_bomb') {
+            targetX = this.targetPos.x;
+            targetY = this.targetPos.y;
+        } else if (this.target && this.target.active) {
+            targetX = this.target.x;
+            targetY = this.target.y;
+        } else {
+            this.active = false;
             return;
         }
-        const dx = this.target.x - this.x; const dy = this.target.y - this.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < this.target.radius) {
+
+        const dx = targetX - this.x;
+        const dy = targetY - this.y;
+        const dist = Math.hypot(dx, dy);
+        
+        if (dist < this.speed) {
             this.active = false;
             playSound('hit');
-            if (this.type === 'cannonball') {
-                dealSplashDamage(this.target.x, this.target.y, this.damage, this.splashRadius);
-                for (let i = 0; i < 20; i++) gameState.particles.push(new Particle(this.target.x, this.target.y, '#f97316', 3));
+            
+            if(this.type === 'poison_bomb') {
+                gameState.areaOfEffects.push(new AreaOfEffect(this.x, this.y, 40, 300, 'poison'));
+            } else if (this.type === 'holy_bomb') {
+                gameState.delayedBombs.push(new DelayedBomb(this.x, this.y, 50, 60, this.damage));
             } else {
-                this.target.takeDamage(this.damage);
-                for (let i = 0; i < 5; i++) gameState.particles.push(new Particle(this.x, this.y, this.getColor()));
+                this.target.takeDamage(this.damage, this.effect);
             }
         } else {
-            this.x += (dx / dist) * this.speed; this.y += (dy / dist) * this.speed;
+            this.x += (dx / dist) * this.speed;
+            this.y += (dy / dist) * this.speed;
         }
     }
-
     draw() {
         ctx.fillStyle = this.getColor();
         ctx.beginPath();
-        if (this.type === 'cannonball') {
-            ctx.arc(this.x, this.y, 5, 0, Math.PI * 2);
-        } else {
-            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        }
+        ctx.arc(this.x, this.y, this.type === 'holy_bomb' ? 8 : 4, 0, Math.PI * 2);
         ctx.fill();
     }
-    
     getColor() {
         switch(this.type) {
             case 'arrow': return '#f59e0b';
-            case 'magic': return '#8b5cf6';
-            case 'cannonball': return '#44403c';
-            default: return '#67e8f9';
+            case 'ice': return '#67e8f9';
+            case 'poison_bomb': return '#84cc16';
+            case 'holy_bomb': return '#fef08a';
+            default: return '#ffffff';
         }
     }
 }
 
 class Particle {
-    constructor(x, y, color, size = 1) {
-        this.x = x; this.y = y; this.color = color;
-        this.size = (Math.random() * 2 + 1) * size; this.life = 30;
-        this.active = true; this.vx = (Math.random() - 0.5) * 3;
-        this.vy = (Math.random() - 0.5) * 3;
+    constructor(x, y, type, direction, angle) {
+        this.x = x; this.y = y; this.type = type;
+        this.active = true;
+        
+        if (type === 'flame') {
+            const spread = (Math.random() - 0.5) * angle;
+            const speed = 1 + Math.random() * 2;
+            this.vx = Math.cos(direction + spread) * speed;
+            this.vy = Math.sin(direction + spread) * speed;
+            this.life = 20 + Math.random() * 20;
+            this.size = 2 + Math.random() * 3;
+            this.color = `rgba(255, ${Math.floor(Math.random() * 150)}, 0, 1)`;
+        }
     }
     update() {
-        if (gameState.isPaused) return;
         this.life--;
         if (this.life <= 0) this.active = false;
-        this.x += this.vx; this.y += this.vy;
+        this.x += this.vx;
+        this.y += this.vy;
     }
     draw() {
-        ctx.globalAlpha = this.life / 30;
+        ctx.globalAlpha = this.life / 40;
         ctx.fillStyle = this.color;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
@@ -989,16 +1008,358 @@ class Particle {
     }
 }
 
-// ==================================
-// 게임 로직 및 유틸리티 함수
-// ==================================
-function getDistance(obj1, obj2) {
-    const dx = obj1.x - obj2.x;
-    const dy = obj1.y - obj2.y;
-    return Math.sqrt(dx * dx + dy * dy);
+class AreaOfEffect {
+    constructor(x, y, radius, duration, type) {
+        this.x = x; this.y = y; this.radius = radius;
+        this.duration = duration; this.type = type;
+        this.active = true;
+        this.tickCooldown = 30; // 0.5초마다
+        this.currentTick = 0;
+    }
+    update() {
+        this.duration--;
+        if (this.duration <= 0) this.active = false;
+        
+        this.currentTick--;
+        if (this.currentTick <= 0) {
+            gameState.enemies.forEach(enemy => {
+                if (getDistance(this, enemy) < this.radius) {
+                    if (this.type === 'poison') {
+                        enemy.takeDamage(5); // 독 데미지
+                    }
+                }
+            });
+            this.currentTick = this.tickCooldown;
+        }
+    }
+    draw() {
+        const alpha = Math.min(1, this.duration / 300);
+        if (this.type === 'poison') {
+            ctx.fillStyle = `rgba(132, 204, 22, ${0.3 * alpha})`;
+        }
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+    }
 }
 
-function findClosestPathPoint(x, y, offset = 0) {
+class DelayedBomb {
+    constructor(x, y, radius, delay, damage) {
+        this.x = x; this.y = y; this.radius = radius;
+        this.timer = delay; this.damage = damage;
+        this.active = true;
+    }
+    update() {
+        this.timer--;
+        if (this.timer <= 0) {
+            this.active = false;
+            playSound('hit'); // Explosion sound
+            gameState.enemies.forEach(enemy => {
+                if (getDistance(this, enemy) < this.radius) {
+                    const percentageDamage = enemy.maxHp * 0.15;
+                    const cappedPercentageDamage = Math.min(percentageDamage, 200);
+                    const totalDamage = this.damage + cappedPercentageDamage;
+                    enemy.takeDamage(totalDamage);
+                }
+            });
+            for(let i = 0; i < 30; i++) {
+                gameState.particles.push(new Particle(this.x, this.y, 'flame', Math.random() * Math.PI * 2, Math.PI * 2));
+            }
+        }
+    }
+    draw() {
+        const progress = this.timer / 60;
+        ctx.strokeStyle = `rgba(254, 240, 138, ${1 - progress})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius * (1 - progress), 0, Math.PI * 2);
+        ctx.stroke();
+    }
+}
+
+// ==================================
+// 게임 초기화 및 흐름
+// ==================================
+function initGame() {
+    if (gameState.animationFrameId) cancelAnimationFrame(gameState.animationFrameId);
+
+    Object.values(GameConfig.towers).forEach(t => {
+        if (t.unlockActivity) t.unlocked = false;
+    });
+
+    gameState = {
+        health: 20,
+        resources: 150,
+        currentRound: 1,
+        currentWave: 0,
+        totalWavesPerRound: 10,
+        towers: [],
+        enemies: [],
+        projectiles: [],
+        soldiers: [],
+        particles: [],
+        areaOfEffects: [],
+        delayedBombs: [],
+        towerSlots: [],
+        enemyPath: [],
+        selectedTowerType: 'archer',
+        selectedTower: null,
+        waveInProgress: false,
+        spawningComplete: false,
+        gameOver: false,
+        isPaused: false,
+        activityInProgress: null,
+        activityTimer: 0,
+        completedActivities: { study: 0, exercise: 0, read: 0, total: 0 },
+        timeoutIds: [],
+        preWaveState: null,
+    };
+    
+    loadRoundData();
+    updateUI();
+    updateTowerButtonsUI();
+    selectTowerType('archer');
+    showTowerSelectionUI();
+    updateDynamicButtons();
+    updateActivityCountUI();
+    
+    gameLoop();
+}
+
+function restartCurrentRound() {
+    if (gameState.animationFrameId) cancelAnimationFrame(gameState.animationFrameId);
+
+    const savedActivities = gameState.completedActivities;
+    const savedUnlockedTowers = {};
+    Object.entries(GameConfig.towers).forEach(([type, data]) => {
+        if (data.unlocked) {
+            savedUnlockedTowers[type] = true;
+        }
+    });
+
+    const currentRound = gameState.currentRound;
+
+    initGame(); // Start with a fresh state
+
+    // Restore progress
+    gameState.currentRound = currentRound;
+    gameState.completedActivities = savedActivities;
+    Object.entries(GameConfig.towers).forEach(([type, data]) => {
+        if (savedUnlockedTowers[type]) {
+            data.unlocked = true;
+        }
+    });
+
+    // Reload data for the current round
+    loadRoundData();
+    updateUI();
+    updateTowerButtonsUI();
+    updateActivityCountUI();
+}
+
+function loadRoundData() {
+    const roundIndex = gameState.currentRound - 1;
+    if (roundIndex >= GameConfig.maps.length) {
+        gameOver(true);
+        return;
+    }
+    const mapData = GameConfig.maps[roundIndex];
+    const container = document.getElementById('canvas-container');
+    canvas.width = container.offsetWidth;
+    canvas.height = container.offsetHeight;
+    
+    gameState.enemyPath = mapData.path.map(p => ({ x: p.x * canvas.width, y: p.y * canvas.height }));
+    if (mapData.path2) {
+        gameState.enemyPath2 = mapData.path2.map(p => ({ x: p.x * canvas.width, y: p.y * canvas.height }));
+    } else {
+        gameState.enemyPath2 = null;
+    }
+
+    gameState.towerSlots = mapData.slots.map(p => ({ x: p.x * canvas.width, y: p.y * canvas.height, tower: null }));
+    gameState.towers = [];
+    gameState.enemies = [];
+    gameState.projectiles = [];
+    gameState.soldiers = [];
+    gameState.particles = [];
+    gameState.areaOfEffects = [];
+    gameState.delayedBombs = [];
+}
+
+function nextRound() {
+    gameState.currentRound++;
+    gameState.currentWave = 0;
+    gameState.resources += 50; // Bonus for clearing a round
+    loadRoundData();
+    updateUI();
+    showTowerSelectionUI();
+    updateDynamicButtons();
+}
+
+function gameLoop() {
+    if (gameState.gameOver) return;
+    gameState.animationFrameId = requestAnimationFrame(gameLoop);
+    if (gameState.isPaused) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawPath();
+    drawTowerSlots();
+
+    if (gameState.activityInProgress) {
+        gameState.activityTimer--;
+        drawActivityTimer();
+        if (gameState.activityTimer <= 0) completeActivity();
+    }
+
+    [...gameState.towers, ...gameState.soldiers, ...gameState.enemies, ...gameState.projectiles, ...gameState.particles, ...gameState.areaOfEffects, ...gameState.delayedBombs].forEach(e => e.update());
+
+    gameState.areaOfEffects.forEach(e => e.draw());
+    gameState.towers.forEach(e => e.draw());
+    gameState.soldiers.sort((a, b) => a.y - b.y).forEach(e => e.draw());
+    gameState.enemies.sort((a, b) => a.y - b.y).forEach(e => e.draw());
+    gameState.projectiles.forEach(e => e.draw());
+    gameState.delayedBombs.forEach(e => e.draw());
+    gameState.particles.forEach(e => e.draw());
+
+    gameState.enemies = gameState.enemies.filter(e => e.active);
+    gameState.projectiles = gameState.projectiles.filter(e => e.active);
+    gameState.soldiers = gameState.soldiers.filter(e => e.active);
+    gameState.particles = gameState.particles.filter(e => e.active);
+    gameState.areaOfEffects = gameState.areaOfEffects.filter(e => e.active);
+    gameState.delayedBombs = gameState.delayedBombs.filter(e => e.active);
+
+    if (gameState.waveInProgress && gameState.spawningComplete && gameState.enemies.length === 0) {
+        endWave();
+    }
+}
+
+function startWave() {
+    if (gameState.waveInProgress || gameState.activityInProgress) return;
+    
+    gameState.preWaveState = {
+        health: gameState.health,
+        resources: gameState.resources,
+        towers: gameState.towers.map(t => ({
+            type: t.type,
+            level: t.level,
+            slotIndex: gameState.towerSlots.indexOf(t.slot)
+        })),
+    };
+
+    gameState.waveInProgress = true;
+    gameState.spawningComplete = false;
+    gameState.currentWave++;
+    
+    updateDynamicButtons();
+    updateUI();
+    
+    const roundWaves = GameConfig.waveCompositionsByRound[gameState.currentRound - 1];
+    let waveComposition = roundWaves.waves[gameState.currentWave - 1];
+    
+    let totalSpawnTime = 0;
+    
+    waveComposition.forEach(([type, count, interval]) => {
+        for (let i = 0; i < count; i++) {
+            const spawnTime = i * interval;
+            const timeoutId = setTimeout(() => {
+                if (!gameState.gameOver) {
+                    const spawnOffset = { x: (Math.random() - 0.5) * 15, y: (Math.random() - 0.5) * 15 };
+                    gameState.enemies.push(new Enemy(type, gameState.currentRound, spawnOffset));
+                }
+            }, spawnTime);
+            gameState.timeoutIds.push(timeoutId);
+            if(spawnTime > totalSpawnTime) totalSpawnTime = spawnTime;
+        }
+    });
+
+    const completionTimeoutId = setTimeout(() => {
+        if (!gameState.gameOver) gameState.spawningComplete = true;
+    }, totalSpawnTime + 1);
+    gameState.timeoutIds.push(completionTimeoutId);
+}
+
+function endWave() {
+    gameState.waveInProgress = false;
+    gameState.spawningComplete = false;
+    gameState.timeoutIds.forEach(clearTimeout);
+    gameState.timeoutIds = [];
+    updateDynamicButtons();
+
+    if (gameState.currentWave >= gameState.totalWavesPerRound) {
+        const isLastRound = gameState.currentRound >= GameConfig.maps.length;
+        ui.modalTitle.textContent = isLastRound ? "🎉 최종 승리! 🎉" : `라운드 ${gameState.currentRound} 클리어!`;
+        ui.modalText.textContent = isLastRound ? "모든 라운드를 클리어했습니다!" : "다음 라운드로 도전하세요.";
+        ui.modalButton.textContent = isLastRound ? "다시 시작" : "다음 라운드";
+        confirmAction = isLastRound ? initGame : nextRound;
+        ui.modal.style.display = 'flex';
+    }
+    updateUI();
+}
+
+function gameOver(isVictory) {
+    if (gameState.gameOver) return;
+    gameState.gameOver = true;
+    cancelAnimationFrame(gameState.animationFrameId);
+    gameState.timeoutIds.forEach(clearTimeout);
+    
+    ui.modalTitle.textContent = isVictory ? "🎉 최종 승리! 🎉" : "게임 오버";
+    ui.modalText.textContent = isVictory ? "모든 적을 막아냈습니다!" : `코어가 파괴되었습니다. (라운드 ${gameState.currentRound} - 웨이브 ${gameState.currentWave})`;
+    ui.modalButton.textContent = "다시 시작";
+    confirmAction = initGame;
+    ui.modal.style.display = 'flex';
+}
+
+function retryWave() {
+    if (!gameState.preWaveState) {
+        playSound('error');
+        return;
+    };
+
+    gameState.timeoutIds.forEach(id => clearTimeout(id));
+    gameState.timeoutIds = [];
+    
+    const snapshot = gameState.preWaveState;
+    gameState.health = snapshot.health;
+    gameState.resources = snapshot.resources;
+    gameState.currentWave--; 
+
+    // Clear current dynamic entities
+    gameState.enemies = [];
+    gameState.projectiles = [];
+    gameState.particles = [];
+    gameState.soldiers = [];
+    gameState.areaOfEffects = [];
+    gameState.delayedBombs = [];
+
+    // Rebuild towers from snapshot
+    gameState.towerSlots.forEach(slot => slot.tower = null);
+    gameState.towers = [];
+    snapshot.towers.forEach(towerData => {
+        const slot = gameState.towerSlots[towerData.slotIndex];
+        if (slot) {
+            const newTower = new Tower(slot, towerData.type);
+            newTower.level = towerData.level;
+            newTower.setStats();
+            slot.tower = newTower;
+            gameState.towers.push(newTower);
+        }
+    });
+
+    gameState.waveInProgress = false;
+    gameState.spawningComplete = false;
+    gameState.preWaveState = null;
+
+    updateUI();
+    updateDynamicButtons();
+    showTowerSelectionUI();
+    playSound('sell');
+}
+
+// ==================================
+// 유틸리티 및 헬퍼 함수
+// ==================================
+function getDistance(obj1, obj2) { return Math.hypot(obj1.x - obj2.x, obj1.y - obj2.y); }
+
+function findClosestPathPoint(x, y) {
     let closestPoint = null;
     let minDistance = Infinity;
 
@@ -1020,235 +1381,20 @@ function findClosestPathPoint(x, y, offset = 0) {
             closestPoint = closest;
         }
     }
-    if (closestPoint && offset !== 0) {
-        const dx = x - closestPoint.x;
-        const dy = y - closestPoint.y;
-        const dist = Math.sqrt(dx*dx + dy*dy);
-        if (dist > 0) {
-            closestPoint.x += (dx / dist) * offset;
-            closestPoint.y += (dy / dist) * offset;
-        }
-    }
     return closestPoint;
 }
 
-function dealSplashDamage(x, y, damage, radius) {
-    gameState.enemies.forEach(enemy => {
-        if (getDistance({x, y}, enemy) <= radius) {
-            enemy.takeDamage(damage);
-        }
-    });
-}
-
-function startWave() {
-    if (gameState.waveInProgress || gameState.activityInProgress || gameState.activityPreCountdown > 0) return;
-    
-    gameState.preWaveState = {
-        health: gameState.health,
-        resources: gameState.resources,
-        towers: gameState.towers.map(t => ({
-            type: t.type,
-            level: t.level,
-            slotIndex: gameState.towerSlots.indexOf(t.slot)
-        })),
-        completedActivities: JSON.parse(JSON.stringify(gameState.completedActivities))
-    };
-
-    gameState.waveInProgress = true;
-    gameState.spawningComplete = false;
-    gameState.wave++;
-    
-    updateDynamicButtons();
-    
-    const normalEnemyCount = 8 + gameState.wave * 4;
-    const spawnInterval = 300;
-    let totalSpawns = normalEnemyCount;
-
-    for (let i = 0; i < normalEnemyCount; i++) {
-        const timeoutId = setTimeout(() => {
-            if (!gameState.gameOver) gameState.enemies.push(new Enemy(gameState.wave, false));
-        }, i * spawnInterval);
-        gameState.timeoutIds.push(timeoutId);
-    }
-
-    if (gameState.wave >= 3) {
-        const uniqueEnemyCount = gameState.wave - 2; // 웨이브가 진행될수록 유니크 유닛 수가 1씩 증가 (3웨이브: 1, 4웨이브: 2, ...)
-        totalSpawns += uniqueEnemyCount;
-        for (let j = 0; j < uniqueEnemyCount; j++) {
-            const spawnDelay = (normalEnemyCount + j) * spawnInterval;
-            const timeoutId = setTimeout(() => {
-                if (!gameState.gameOver) gameState.enemies.push(new Enemy(gameState.wave, true));
-            }, spawnDelay);
-            gameState.timeoutIds.push(timeoutId);
-        }
-    }
-
-    const totalSpawnTime = (totalSpawns - 1) * spawnInterval;
-    const completionTimeoutId = setTimeout(() => {
-        if (!gameState.gameOver) gameState.spawningComplete = true;
-    }, totalSpawnTime + 1);
-    gameState.timeoutIds.push(completionTimeoutId);
-
+function takeDamageToCore(damage) {
+    gameState.health -= damage;
+    if (gameState.health < 0) gameState.health = 0;
     updateUI();
-}
 
-function endWave() {
-    gameState.waveInProgress = false;
-    gameState.spawningComplete = false;
-    updateDynamicButtons();
-    if (gameState.wave >= gameState.totalWaves) {
-        gameOver(true);
-    }
-    updateUI();
-}
+    ui.healthHud.classList.remove('hurt');
+    void ui.healthHud.offsetWidth; // Trigger reflow to restart animation
+    ui.healthHud.classList.add('hurt');
 
-function gameOver(isVictory) {
-    if (gameState.gameOver) return;
-    gameState.gameOver = true;
-    gameState.gameWon = isVictory;
-    cancelAnimationFrame(gameState.animationFrameId);
-    gameState.timeoutIds.forEach(id => clearTimeout(id));
-    ui.modalTitle.textContent = isVictory ? "승리!" : "게임 오버";
-    ui.modalText.textContent = isVictory ? `축하합니다! 최종 점수: ${gameState.resources}` : `코어가 파괴되었습니다. 최종 웨이브: ${gameState.wave}`;
-    ui.modalButton.textContent = "다시 시작";
-    ui.modal.style.display = 'flex';
-}
-
-function retryWave() {
-    if (!gameState.preWaveState) return;
-
-    gameState.timeoutIds.forEach(id => clearTimeout(id));
-    gameState.timeoutIds = [];
-    gameState.enemies = [];
-    gameState.projectiles = [];
-    gameState.particles = [];
-    gameState.soldiers.forEach(s => s.active = false);
-    gameState.soldiers = [];
-    gameState.waveInProgress = false;
-    gameState.spawningComplete = false;
-
-    const snapshot = gameState.preWaveState;
-    gameState.health = snapshot.health;
-    gameState.resources = snapshot.resources;
-    gameState.wave--; 
-    gameState.completedActivities = snapshot.completedActivities;
-
-    gameState.towerSlots.forEach(slot => slot.tower = null);
-    gameState.towers = [];
-    snapshot.towers.forEach(towerData => {
-        const slot = gameState.towerSlots[towerData.slotIndex];
-        if (slot) {
-            const newTower = new Tower(slot, towerData.type);
-            newTower.level = towerData.level;
-            newTower.setStats();
-            slot.tower = newTower;
-            gameState.towers.push(newTower);
-        }
-    });
-
-    gameState.preWaveState = null;
-
-    updateUI();
-    updateDynamicButtons();
-    updateActivityCountUI();
-    showTowerSelectionUI();
-    
-    playSound('sell');
-}
-
-
-function startActivity(type) {
-    if (gameState.waveInProgress || gameState.activityInProgress || gameState.activityPreCountdown > 0) return;
-    gameState.activityPending = type;
-    gameState.activityPreCountdown = ACTIVITY_DATA.preCountdownDuration;
-    updateDynamicButtons();
-    playSound('upgrade');
-}
-
-function completeActivity() {
-    playSound('upgrade');
-    const activityType = gameState.activityInProgress;
-    if(activityType) {
-        gameState.completedActivities[activityType]++;
-        checkUnlocks(activityType);
-    }
-    gameState.activityInProgress = null;
-    gameState.activityTimer = 0;
-    updateUI();
-    updateDynamicButtons();
-    updateActivityCountUI();
-}
-
-function checkUnlocks(activityType) {
-    for (const type in TOWER_DATA) {
-        const data = TOWER_DATA[type];
-        if (data.unlockActivity === activityType && !data.unlocked) {
-            if (gameState.completedActivities[activityType] >= 1) {
-                data.unlocked = true;
-                updateTowerButtonsUI();
-                showNotification(`${data.name} 타워 해금!`, 300);
-                playSound('upgrade');
-            }
-        }
-    }
-}
-
-function giveUpActivity() {
-    if (!gameState.activityInProgress && gameState.activityPreCountdown <= 0) return;
-
-    gameState.resources -= 100;
-    if (gameState.resources < 0) gameState.resources = 0;
-
-    gameState.activityInProgress = null;
-    gameState.activityTimer = 0;
-    gameState.activityPending = null;
-    gameState.activityPreCountdown = 0;
-
-    playSound('sell');
-    updateUI();
-    updateDynamicButtons();
-}
-
-function initiateMoveTower() {
-    if (gameState.waveInProgress || gameState.activityInProgress || gameState.activityPreCountdown > 0 || !gameState.selectedTower) return;
-    gameState.isMovingTower = true;
-    gameState.towerToMove = gameState.selectedTower;
-    showTowerSelectionUI();
-}
-
-function finalizeMoveTower(newSlot) {
-    const tower = gameState.towerToMove;
-    if (!tower || newSlot.tower) {
-        gameState.isMovingTower = false;
-        gameState.towerToMove = null;
-        return;
-    }
-    tower.slot.tower = null;
-    tower.slot = newSlot;
-    tower.x = newSlot.x;
-    tower.y = newSlot.y;
-    newSlot.tower = tower;
-
-    if (tower.type === 'barracks') {
-        tower.rallyPoint = findClosestPathPoint(tower.x, tower.y, 0);
-        tower.soldiers.forEach(s => s.active = false);
-        tower.soldiers = [];
-    }
-
-    gameState.isMovingTower = false;
-    gameState.towerToMove = null;
-    playSound('build');
-}
-
-function togglePause() {
-    if (gameState.gameOver) return;
-    gameState.isPaused = !gameState.isPaused;
-    if (gameState.isPaused) {
-        ui.pauseModal.style.display = 'flex';
-        ui.pauseButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
-    } else {
-        ui.pauseModal.style.display = 'none';
-        ui.pauseButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
+    if (gameState.health <= 0 && !gameState.gameOver) {
+        gameOver(false);
     }
 }
 
@@ -1258,72 +1404,74 @@ function togglePause() {
 function updateUI() {
     ui.health.textContent = gameState.health;
     ui.resources.textContent = gameState.resources;
-    ui.wave.textContent = `${gameState.wave} / ${gameState.totalWaves}`;
-    ui.startWaveButton.textContent = gameState.waveInProgress ? `웨이브 ${gameState.wave} 진행 중` : `웨이브 ${gameState.wave + 1} 시작`;
+    ui.waveInfo.textContent = `R${gameState.currentRound} ${gameState.currentWave}/${gameState.totalWavesPerRound}`;
+    ui.startWaveButton.textContent = gameState.waveInProgress ? `웨이브 ${gameState.currentWave} 진행 중` : `웨이브 ${gameState.currentWave + 1} 시작`;
 }
 
 function updateTowerButtonsUI() {
-    document.querySelectorAll('.tower-button').forEach(btn => {
-        const type = btn.dataset.towerType;
-        const data = TOWER_DATA[type];
+    ui.towerButtonsContainer.innerHTML = '';
+    const towerOrder = [
+        'archer', 'barracks', 'ice',
+        'poisonSprayer', 'flamethrower', 'holyBomber',
+        'laboratory', 'warDrums', 'weaknessAnalyzer'
+    ];
+
+    towerOrder.forEach(type => {
+        const data = GameConfig.towers[type];
         if (!data) return;
 
-        const tooltip = btn.querySelector('.tooltip');
-
-        if (data.unlockActivity && !data.unlocked) { // 잠긴 해금 타워
-            btn.classList.add('locked', 'bg-slate-900', 'border-slate-700');
-            btn.classList.remove('bg-slate-800', 'border-slate-600');
-            btn.disabled = true;
-            if (tooltip) {
-                const activityName = data.unlockActivity === 'study' ? '공부' : data.unlockActivity === 'exercise' ? '운동' : '독서';
-                tooltip.textContent = `${data.description} (해금: ${activityName} 1회)`;
-            }
-        } else { // 기본 타워 또는 해금된 타워
-            btn.classList.remove('locked', 'bg-slate-900', 'border-slate-700');
-            btn.classList.add('bg-slate-800', 'border-slate-600');
-            btn.disabled = false;
-            const icon = btn.querySelector('.text-3xl');
-            if (icon) icon.classList.remove('opacity-30');
-            const name = btn.querySelector('.font-bold');
-            if(name) name.classList.remove('text-slate-500');
-            if (tooltip) {
-                tooltip.textContent = data.description;
-            }
+        const button = document.createElement('button');
+        button.dataset.towerType = type;
+        button.className = 'tower-button flex flex-col items-center justify-between p-1 rounded-lg border transition-all duration-200 relative h-24';
+        
+        const isUnlocked = data.unlocked;
+        
+        let descriptionText = '';
+        if (isUnlocked) {
+            descriptionText = data.shortDesc;
+        } else {
+            const activityName = data.unlockActivity === 'study' ? '공부' : data.unlockActivity === 'exercise' ? '운동' : '독서';
+            descriptionText = `${activityName} ${data.unlockCount || 1}회`;
         }
+
+        button.innerHTML = `
+            <div class="flex flex-col items-center text-center">
+                <span class="text-2xl ${!isUnlocked ? 'opacity-30' : ''}">${data.icon}</span>
+                <span class="font-bold text-xs leading-tight ${!isUnlocked ? 'text-slate-500' : ''}">${data.name}</span>
+            </div>
+            <div class="text-center">
+                <span class="text-cyan-400 text-[10px] leading-tight">${descriptionText}</span>
+                <span class="text-yellow-400 text-xs block">${data.costs[0]}💰</span>
+            </div>
+            <div class="lock-overlay absolute inset-0 items-center justify-center bg-black bg-opacity-60 rounded-lg"><span class="text-2xl">🔒</span></div>
+        `;
+
+        if (isUnlocked) {
+            button.classList.add('bg-slate-800', 'border-slate-600');
+        } else {
+            button.classList.add('locked', 'bg-slate-900', 'border-slate-700');
+            button.disabled = true;
+        }
+        
+        button.addEventListener('click', () => {
+            selectTowerType(type);
+            showTowerSelectionUI();
+        });
+        ui.towerButtonsContainer.appendChild(button);
     });
 }
 
-
 function updateDynamicButtons() {
-    const isBuildPhase = !gameState.waveInProgress && !gameState.activityInProgress && !gameState.activityPreCountdown > 0;
-    const isActivityPhase = gameState.activityInProgress || gameState.activityPreCountdown > 0;
-
+    const isBuildPhase = !gameState.waveInProgress && !gameState.activityInProgress;
     ui.startWaveButton.disabled = !isBuildPhase;
-    ui.giveUpButton.disabled = !gameState.waveInProgress;
-    
-    if (isActivityPhase) {
-        ui.activityButtonsContainer.classList.add('hidden');
-        ui.giveUpActivityButton.classList.remove('hidden');
-    } else {
-        ui.activityButtonsContainer.classList.remove('hidden');
-        ui.giveUpActivityButton.classList.add('hidden');
-        ui.activityButtons.forEach(btn => btn.disabled = !isBuildPhase);
-    }
-    
-    if (gameState.selectedTower) {
-        showTowerManagementUI(gameState.selectedTower);
-    }
-}
-
-function updateActivityCountUI() {
-    ui.activityCounts.study.textContent = gameState.completedActivities.study;
-    ui.activityCounts.exercise.textContent = gameState.completedActivities.exercise;
-    ui.activityCounts.reading.textContent = gameState.completedActivities.reading;
+    ui.retryWaveButton.disabled = !gameState.waveInProgress;
+    ui.activityButtons.forEach(btn => btn.disabled = !isBuildPhase);
+    ui.giveUpActivityButton.classList.toggle('hidden', !gameState.activityInProgress);
 }
 
 function selectTowerType(type) {
     gameState.selectedTowerType = type;
-    ui.towerButtons.forEach(btn => {
+    document.querySelectorAll('.tower-button').forEach(btn => {
         btn.classList.toggle('selected', btn.dataset.towerType === type);
     });
 }
@@ -1336,35 +1484,60 @@ function showTowerSelectionUI() {
 
 function showTowerManagementUI(tower) {
     gameState.selectedTower = tower;
-    const data = TOWER_DATA[tower.type];
+    const data = GameConfig.towers[tower.type];
     ui.selectedTowerName.textContent = data.name;
     ui.selectedTowerLevel.textContent = `레벨 ${tower.level + 1}`;
     ui.selectedTowerDescription.textContent = data.description || '';
     
-    const canManage = !gameState.waveInProgress && !gameState.activityInProgress && !gameState.activityPreCountdown > 0;
+    const canManage = !gameState.waveInProgress && !gameState.activityInProgress;
     
-    ui.moveButton.disabled = !canManage;
-    ui.sellButton.disabled = !canManage;
+    const upgradeButton = ui.upgradeButton;
+    const sellButton = ui.sellButton;
+    const skillButton = ui.skillButton;
 
-    if (tower.level < data.costs.length - 1) {
-        const upgradeCost = data.costs[tower.level + 1];
-        ui.upgradeButton.textContent = `업글 (${upgradeCost}💰)`;
-        ui.upgradeButton.disabled = !canManage || gameState.resources < upgradeCost;
+    if (tower.skill) {
+        skillButton.classList.remove('hidden');
+        upgradeButton.className = sellButton.className = "col-span-1 bg-blue-600 hover:bg-blue-500 rounded-lg p-3 font-bold transition-colors";
+        sellButton.classList.replace('bg-blue-600', 'bg-red-700');
+        sellButton.classList.replace('hover:bg-blue-500', 'hover:bg-red-600');
+        
+        if (tower.skillCooldown > 0) {
+            skillButton.textContent = `쿨 (${Math.ceil(tower.skillCooldown / 60)}초)`;
+            skillButton.disabled = true;
+        } else {
+            skillButton.textContent = `스킬 (${tower.skill.cost}💰)`;
+            skillButton.disabled = gameState.resources < tower.skill.cost;
+        }
     } else {
-        ui.upgradeButton.textContent = '최대 레벨';
-        ui.upgradeButton.disabled = true;
+        skillButton.classList.add('hidden');
+        upgradeButton.className = "col-span-2 bg-blue-600 hover:bg-blue-500 rounded-lg p-3 font-bold transition-colors";
+        sellButton.className = "col-span-1 bg-red-700 hover:bg-red-600 rounded-lg p-3 font-bold transition-colors";
+    }
+
+    const isUpgradable = data.damages || data.spawnRates;
+    if (!isUpgradable) {
+        upgradeButton.disabled = true;
+        upgradeButton.textContent = '업그레이드 불가';
+    } else {
+        upgradeButton.disabled = !canManage || tower.level >= data.costs.length - 1;
+        if (tower.level < data.costs.length - 1) {
+            const upgradeCost = data.costs[tower.level + 1];
+            upgradeButton.textContent = `업글 (${upgradeCost}💰)`;
+            upgradeButton.disabled = !canManage || gameState.resources < upgradeCost;
+        } else {
+            upgradeButton.textContent = '최대 레벨';
+            upgradeButton.disabled = true;
+        }
     }
     
+    sellButton.disabled = !canManage;
+    
     let totalCost = 0;
-    for (let i = 0; i <= tower.level; i++) { totalCost += TOWER_DATA[tower.type].costs[i]; }
-    ui.sellButton.textContent = `판매 (${totalCost}💰)`;
-
+    for (let i = 0; i <= tower.level; i++) { totalCost += data.costs[i]; }
+    sellButton.textContent = `판매`;
+    
     ui.towerSelectionUI.classList.add('hidden');
     ui.towerManagementUI.classList.remove('hidden');
-}
-
-function showNotification(message, duration = 180) {
-    gameState.notification = { message, timer: duration };
 }
 
 function handleCanvasClick(e) {
@@ -1374,6 +1547,13 @@ function handleCanvasClick(e) {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
+    for (const tower of gameState.towers) {
+        if (getDistance({x,y}, tower) < 20) {
+            showTowerManagementUI(tower);
+            return;
+        }
+    }
+
     let clickedSlot = null;
     for (const slot of gameState.towerSlots) {
         if (getDistance({x,y}, slot) < 20) {
@@ -1381,49 +1561,17 @@ function handleCanvasClick(e) {
             break;
         }
     }
-
-    if (gameState.isMovingTower) {
-        if (clickedSlot) {
-            finalizeMoveTower(clickedSlot);
-        } else {
-            gameState.isMovingTower = false;
-            gameState.towerToMove = null;
-        }
-        return;
-    }
-
-    if (clickedSlot) {
-        handleSlotClick(clickedSlot);
-    } else {
-        let clickedOnTower = false;
-        for (const tower of gameState.towers) {
-            if (getDistance({x,y}, tower) < 20) {
-                showTowerManagementUI(tower);
-                clickedOnTower = true;
-                break;
-            }
-        }
-        if (!clickedOnTower) {
-            showTowerSelectionUI();
-        }
-    }
+    
+    if (clickedSlot) handleSlotClick(clickedSlot);
+    else showTowerSelectionUI();
 }
 
 function handleSlotClick(slot) {
-    const isBuildPhase = !gameState.waveInProgress && !gameState.activityInProgress && !gameState.activityPreCountdown > 0;
-    if (!isBuildPhase) return;
-
-    if (slot.tower) {
-        showTowerManagementUI(slot.tower);
-        return;
-    }
+    if (gameState.waveInProgress || gameState.activityInProgress || slot.tower) return;
 
     const type = gameState.selectedTowerType;
-    const data = TOWER_DATA[type];
-    if (data.unlocked === false) {
-        playSound('error');
-        return;
-    }
+    const data = GameConfig.towers[type];
+    if (!data.unlocked) { playSound('error'); return; }
     const cost = data.costs[0];
 
     if (gameState.resources >= cost) {
@@ -1439,6 +1587,79 @@ function handleSlotClick(slot) {
 }
 
 // ==================================
+// 활동 관련 함수
+// ==================================
+function startActivity(type) {
+    if (gameState.waveInProgress || gameState.activityInProgress) return;
+    gameState.activityInProgress = type;
+    gameState.activityTimer = GameConfig.activities[type].duration;
+    updateDynamicButtons();
+    playSound('upgrade');
+}
+
+function completeActivity() {
+    const type = gameState.activityInProgress;
+    gameState.resources += GameConfig.activities[type].reward;
+    gameState.completedActivities[type]++;
+    gameState.completedActivities.total++;
+    checkUnlocks();
+    
+    gameState.activityInProgress = null;
+    gameState.activityTimer = 0;
+    updateUI();
+    updateDynamicButtons();
+    updateActivityCountUI();
+    playSound('upgrade');
+}
+
+function giveUpActivity() {
+    if (!gameState.activityInProgress) return;
+    gameState.activityInProgress = null;
+    gameState.activityTimer = 0;
+    playSound('sell');
+    updateDynamicButtons();
+}
+
+function checkUnlocks() {
+    Object.entries(GameConfig.towers).forEach(([type, data]) => {
+        if (!data.unlocked && data.unlockActivity) {
+            if (gameState.completedActivities[data.unlockActivity] >= data.unlockCount) {
+                data.unlocked = true;
+                updateTowerButtonsUI();
+            }
+        }
+    });
+}
+
+function updateActivityCountUI() {
+    ui.activityCounts.study.textContent = gameState.completedActivities.study;
+    ui.activityCounts.exercise.textContent = gameState.completedActivities.exercise;
+    ui.activityCounts.read.textContent = gameState.completedActivities.read;
+}
+
+function drawActivityTimer() {
+    const type = gameState.activityInProgress;
+    const duration = GameConfig.activities[type].duration;
+    const progress = 1 - (gameState.activityTimer / duration);
+    const barWidth = canvas.width * 0.8;
+    const barX = (canvas.width - barWidth) / 2;
+    
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillRect(barX, 20, barWidth, 30);
+    ctx.fillStyle = "#22c55e";
+    ctx.fillRect(barX, 20, barWidth * progress, 30);
+    
+    const totalSeconds = Math.ceil(gameState.activityTimer / 60);
+    const timeString = `${String(totalSeconds).padStart(2, '0')}초`;
+
+    ctx.fillStyle = "white";
+    ctx.font = "16px Jua";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`${GameConfig.activities[type].name} 중... ${timeString}`, canvas.width / 2, 35);
+}
+
+// ==================================
 // 사운드
 // ==================================
 function setupSound() {
@@ -1449,16 +1670,19 @@ function setupSound() {
 function playSound(type) {
     if (!synth) return;
     try {
-        let time = Tone.now();
-        if (time <= lastSoundTime) { time = lastSoundTime + soundOffset; }
-        lastSoundTime = time;
+        let scheduledTime = Tone.now();
+        if (scheduledTime <= lastSoundTime) {
+            scheduledTime = lastSoundTime + 0.01;
+        }
+        lastSoundTime = scheduledTime;
+
         switch(type) {
-            case 'shoot': synth.triggerAttackRelease("C5", "16n", time, 0.3); break;
-            case 'hit': hitSynth.triggerAttackRelease("C2", "8n", time, 0.5); break;
-            case 'build': synth.triggerAttackRelease("C4", "8n", time); break;
-            case 'sell': synth.triggerAttackRelease("E3", "8n", time); break;
-            case 'upgrade': synth.triggerAttackRelease(["C4", "E4", "G4"], "8n", time); break;
-            case 'error': synth.triggerAttackRelease("F#3", "8n", time); break;
+            case 'shoot': synth.triggerAttackRelease("C5", "16n", scheduledTime, 0.3); break;
+            case 'hit': hitSynth.triggerAttackRelease("C2", "8n", scheduledTime, 0.5); break;
+            case 'build': synth.triggerAttackRelease("C4", "8n", scheduledTime); break;
+            case 'sell': synth.triggerAttackRelease("E3", "8n", scheduledTime); break;
+            case 'upgrade': synth.triggerAttackRelease(["C4", "E4", "G4"], "8n", scheduledTime); break;
+            case 'error': synth.triggerAttackRelease("F#3", "8n", scheduledTime); break;
         }
     } catch(e) { console.error("Sound error", e); }
 }
@@ -1469,27 +1693,12 @@ function playSound(type) {
 function setupEventListeners() {
     ui.modalButton.addEventListener('click', () => {
         ui.modal.style.display = 'none';
-        if (!synth) {
-            Tone.start().then(setupSound);
-        }
-        init();
+        if (!synth) Tone.start().then(setupSound);
+        if (confirmAction) confirmAction();
     });
 
     canvas.addEventListener('click', handleCanvasClick);
-    canvas.addEventListener('mousemove', e => {
-        const rect = canvas.getBoundingClientRect();
-        gameState.mousePos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-    });
-
-    ui.towerButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            selectTowerType(btn.dataset.towerType);
-            showTowerSelectionUI();
-        });
-    });
-
     ui.startWaveButton.addEventListener('click', startWave);
-
     ui.upgradeButton.addEventListener('click', () => {
         if (gameState.selectedTower && gameState.selectedTower.upgrade()) {
             showTowerManagementUI(gameState.selectedTower);
@@ -1503,14 +1712,20 @@ function setupEventListeners() {
             updateUI();
         }
     });
-    ui.moveButton.addEventListener('click', initiateMoveTower);
+    ui.skillButton.addEventListener('click', () => {
+        if (gameState.selectedTower) {
+            gameState.selectedTower.activateSkill();
+        }
+    });
     ui.closeManagementUI.addEventListener('click', showTowerSelectionUI);
     
     ui.tabButtons.forEach(button => {
         button.addEventListener('click', () => {
             const tabId = `panel-${button.dataset.tab}`;
-            ui.tabButtons.forEach(btn => btn.classList.remove('active'));
-            button.classList.add('active');
+            ui.tabButtons.forEach(btn => btn.classList.remove('active', 'text-cyan-400', 'border-cyan-400'));
+            ui.tabButtons.forEach(btn => btn.classList.add('text-slate-400', 'border-transparent'));
+            button.classList.add('active', 'text-cyan-400', 'border-cyan-400');
+            button.classList.remove('text-slate-400', 'border-transparent');
             ui.tabPanels.forEach(panel => panel.id === tabId ? panel.classList.remove('hidden') : panel.classList.add('hidden'));
             showTowerSelectionUI();
         });
@@ -1522,39 +1737,75 @@ function setupEventListeners() {
     
     ui.giveUpActivityButton.addEventListener('click', giveUpActivity);
     
-    ui.pauseButton.addEventListener('click', togglePause);
-    ui.pauseModal.addEventListener('click', togglePause);
-    
-    ui.giveUpButton.addEventListener('click', () => {
-        if (gameState.waveInProgress) {
-            ui.confirmTitle.textContent = "웨이브 재시도";
-            ui.confirmText.textContent = "현재 웨이브를 처음부터 다시 시작하시겠습니까?";
+    ui.retryWaveButton.addEventListener('click', () => {
+        if(gameState.waveInProgress) {
+            ui.confirmTitle.textContent = "웨이브 재도전";
+            ui.confirmText.textContent = "현재 웨이브를 다시 시작하시겠습니까?";
             confirmAction = retryWave;
             ui.confirmModal.style.display = 'flex';
         }
     });
 
-    ui.confirmYesButton.addEventListener('click', () => {
-        if (confirmAction) {
-            confirmAction();
+    ui.restartGameButton.addEventListener('click', () => {
+        if (gameState.currentRound > 1) {
+            ui.confirmTitle.textContent = "라운드 재시작";
+            ui.confirmText.textContent = `현재 라운드(${gameState.currentRound})를 처음부터 다시 시작하시겠습니까? (해금된 유닛은 유지됩니다)`;
+            confirmAction = restartCurrentRound;
+        } else {
+            ui.confirmTitle.textContent = "게임 재시작";
+            ui.confirmText.textContent = "정말로 게임을 처음부터 다시 시작하시겠습니까?";
+            confirmAction = initGame;
         }
+        ui.confirmModal.style.display = 'flex';
+    });
+
+    ui.confirmYesButton.addEventListener('click', () => {
+        if (confirmAction) confirmAction();
         ui.confirmModal.style.display = 'none';
-        confirmAction = null;
     });
 
     ui.confirmNoButton.addEventListener('click', () => {
         ui.confirmModal.style.display = 'none';
-        confirmAction = null;
     });
 
-    window.addEventListener('resize', () => {
-        if (!gameState.gameOver) {
-            ui.modalTitle.textContent = "화면 크기 변경됨";
-            ui.modalText.textContent = "최적의 플레이를 위해 게임을 다시 시작합니다.";
-            ui.modalButton.textContent = "확인";
-            ui.modal.style.display = 'flex';
-            if (gameState.animationFrameId) cancelAnimationFrame(gameState.animationFrameId);
+    // 초기 모달 설정
+    ui.modalTitle.textContent = "자기계발 디펜스";
+    ui.modalText.textContent = "다가오는 적들로부터 코어를 지켜내세요! 활동으로 타워를 해금하고, 건설하여 승리하세요.";
+    ui.modalButton.textContent = "게임 시작";
+    confirmAction = initGame;
+    ui.modal.style.display = 'flex';
+}
+
+function drawPath() {
+    ctx.strokeStyle = 'rgba(100, 116, 139, 0.4)';
+    ctx.lineWidth = 30;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(gameState.enemyPath[0].x, gameState.enemyPath[0].y);
+    for (let i = 1; i < gameState.enemyPath.length; i++) {
+        ctx.lineTo(gameState.enemyPath[i].x, gameState.enemyPath[i].y);
+    }
+    ctx.stroke();
+
+    if (gameState.enemyPath2) {
+        ctx.beginPath();
+        ctx.moveTo(gameState.enemyPath2[0].x, gameState.enemyPath2[0].y);
+        for (let i = 1; i < gameState.enemyPath2.length; i++) {
+            ctx.lineTo(gameState.enemyPath2[i].x, gameState.enemyPath2[i].y);
         }
+        ctx.stroke();
+    }
+}
+
+function drawTowerSlots() {
+    gameState.towerSlots.forEach((slot) => {
+        ctx.fillStyle = slot.tower ? 'rgba(56, 189, 248, 0.1)' : 'rgba(255, 255, 255, 0.05)';
+        ctx.strokeStyle = 'rgba(100, 116, 139, 0.7)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(slot.x, slot.y, 20, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
     });
 }
 
@@ -1564,3 +1815,27 @@ setupEventListeners();
 </script>
 </body>
 </html>
+```
+
+```json
+{
+  "name": "자기계발 타워 디펜스",
+  "short_name": "자기계발 디펜스",
+  "start_url": ".",
+  "display": "fullscreen",
+  "background_color": "#0c1427",
+  "theme_color": "#0c1427",
+  "description": "활동으로 강해지는 타워 디펜스 게임",
+  "icons": [
+    {
+      "src": "https://placehold.co/192x192/0c1427/FFFFFF?text=TD",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://placehold.co/512x512/0c1427/FFFFFF?text=TD",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
