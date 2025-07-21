@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>자기계발 타워 디펜스 v2</title>
+    <title>자기계발 타워 디펜스</title>
+    <meta name="theme-color" content="#0c1427"/>
+    <link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -120,17 +122,17 @@
                          <button data-activity="study" class="activity-button flex flex-col items-center p-2 bg-slate-800 rounded-lg border border-slate-600 disabled:bg-slate-700 disabled:cursor-not-allowed">
                             <span class="text-3xl">📚</span>
                             <span class="font-bold">공부 (<span id="study-count">0</span>)</span>
-                            <span class="text-xs text-slate-400">30분</span>
+                            <span class="text-xs text-slate-400">10초</span>
                         </button>
                         <button data-activity="exercise" class="activity-button flex flex-col items-center p-2 bg-slate-800 rounded-lg border border-slate-600 disabled:bg-slate-700 disabled:cursor-not-allowed">
                             <span class="text-3xl">🏋️</span>
                             <span class="font-bold">운동 (<span id="exercise-count">0</span>)</span>
-                            <span class="text-xs text-slate-400">30분</span>
+                            <span class="text-xs text-slate-400">10초</span>
                         </button>
                         <button data-activity="read" class="activity-button flex flex-col items-center p-2 bg-slate-800 rounded-lg border border-slate-600 disabled:bg-slate-700 disabled:cursor-not-allowed">
                             <span class="text-3xl">📖</span>
                             <span class="font-bold">독서 (<span id="read-count">0</span>)</span>
-                            <span class="text-xs text-slate-400">30분</span>
+                            <span class="text-xs text-slate-400">10초</span>
                         </button>
                     </div>
                     <button id="give-up-activity-button" class="hidden w-full mt-2 bg-red-800 hover:bg-red-700 rounded-lg p-3 font-bold transition-colors">활동 포기</button>
@@ -277,9 +279,9 @@ const GameConfig = {
 
     // 활동 데이터
     activities: {
-        study: { name: '공부', duration: 30 * 60 * 60, reward: 100 },
-        exercise: { name: '운동', duration: 30 * 60 * 60, reward: 100 },
-        read: { name: '독서', duration: 30 * 60 * 60, reward: 100 },
+        study: { name: '공부', duration: 30 * 60*60, reward: 100 },
+        exercise: { name: '운동', duration: 30 * 60*60, reward: 100 },
+        read: { name: '독서', duration: 10 * 60, reward: 100 },
     }
 };
 
@@ -311,9 +313,6 @@ const ui = {
     tabPanels: document.querySelectorAll('.tab-panel'),
     activityButtons: document.querySelectorAll('.activity-button'),
     giveUpActivityButton: document.getElementById('give-up-activity-button'),
-    activityControlsContainer: document.getElementById('activity-controls-container'),
-    pauseActivityButton: document.getElementById('pause-activity-button'),
-    activityPrompt: document.getElementById('activity-prompt'),
     activityCounts: {
         study: document.getElementById('study-count'),
         exercise: document.getElementById('exercise-count'),
@@ -1651,9 +1650,7 @@ function drawActivityTimer() {
     ctx.fillRect(barX, 20, barWidth * progress, 30);
     
     const totalSeconds = Math.ceil(gameState.activityTimer / 60);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    const timeString = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    const timeString = `${String(totalSeconds).padStart(2, '0')}초`;
 
     ctx.fillStyle = "white";
     ctx.font = "16px Jua";
@@ -1811,7 +1808,17 @@ function drawTowerSlots() {
         ctx.stroke();
     });
 }
-
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js') // sw.js 파일의 경로를 정확히 지정
+      .then(registration => {
+        console.log('Service Worker 등록 성공:', registration.scope);
+      })
+      .catch(error => {
+        console.error('Service Worker 등록 실패:', error);
+      });
+  });
+}
 // 게임 시작
 setupEventListeners();
 
