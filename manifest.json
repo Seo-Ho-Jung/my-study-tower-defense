@@ -1,11 +1,11 @@
 {
   "name": "자기계발 타워 디펜스",
-  "short_name": "자기계발 디펜스",
+  "short_name": "자기계발TD",
   "start_url": ".",
   "display": "fullscreen",
   "background_color": "#0c1427",
   "theme_color": "#0c1427",
-  "description": "활동으로 강해지는 타워 디펜스 게임",
+  "description": "자기계발을 테마로 한 타워 디펜스 게임",
   "icons": [
     {
       "src": "https://placehold.co/192x192/0c1427/FFFFFF?text=TD",

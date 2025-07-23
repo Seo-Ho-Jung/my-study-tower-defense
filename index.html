@@ -81,6 +81,8 @@
         <!-- 게임 캔버스 -->
         <div id="canvas-container" class="flex-1 relative">
             <canvas id="gameCanvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+            <!-- 일시정지 버튼 z-index 수정 (z-10 -> z-30) -->
+            <button id="pause-button" class="absolute top-2 right-2 hud-item rounded-lg px-4 py-2 font-bold z-30">일시정지</button>
         </div>
 
         <!-- 하단 컨트롤 패널 -->
@@ -122,17 +124,17 @@
                          <button data-activity="study" class="activity-button flex flex-col items-center p-2 bg-slate-800 rounded-lg border border-slate-600 disabled:bg-slate-700 disabled:cursor-not-allowed">
                             <span class="text-3xl">📚</span>
                             <span class="font-bold">공부 (<span id="study-count">0</span>)</span>
-                            <span class="text-xs text-slate-400">10초</span>
+                            <span class="text-xs text-slate-400">30분</span>
                         </button>
                         <button data-activity="exercise" class="activity-button flex flex-col items-center p-2 bg-slate-800 rounded-lg border border-slate-600 disabled:bg-slate-700 disabled:cursor-not-allowed">
                             <span class="text-3xl">🏋️</span>
                             <span class="font-bold">운동 (<span id="exercise-count">0</span>)</span>
-                            <span class="text-xs text-slate-400">10초</span>
+                            <span class="text-xs text-slate-400">30분</span>
                         </button>
                         <button data-activity="read" class="activity-button flex flex-col items-center p-2 bg-slate-800 rounded-lg border border-slate-600 disabled:bg-slate-700 disabled:cursor-not-allowed">
                             <span class="text-3xl">📖</span>
                             <span class="font-bold">독서 (<span id="read-count">0</span>)</span>
-                            <span class="text-xs text-slate-400">10초</span>
+                            <span class="text-xs text-slate-400">30분</span>
                         </button>
                     </div>
                     <button id="give-up-activity-button" class="hidden w-full mt-2 bg-red-800 hover:bg-red-700 rounded-lg p-3 font-bold transition-colors">활동 포기</button>
@@ -170,6 +172,11 @@
                     <button id="confirm-no-button" class="flex-1 bg-slate-600 hover:bg-slate-500 rounded-lg p-3 font-bold transition-colors">아니오</button>
                 </div>
             </div>
+        </div>
+        
+        <!-- 일시정지 오버레이 -->
+        <div id="pause-overlay" class="hidden absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center z-20">
+            <h2 class="text-5xl font-bold text-cyan-400">일시정지됨</h2>
         </div>
     </div>
 
@@ -215,7 +222,7 @@ const GameConfig = {
         holyBomber: { name: '신성한 폭격기', icon: '✨', costs: [100, 130, 170, 220, 280], damages: [26, 36, 50, 68, 90], ranges: [150, 155, 160, 165, 170], fireRates: [180, 170, 160, 150, 140], projectileType: 'holy_bomb', description: '체력이 높은 적에게 추가 피해를 주는 포탄을 떨어트립니다.', shortDesc: '탱크/보스 킬러', unlockActivity: 'read', unlockCount: 1, unlocked: false },
 
         // 활동 2회 해금 (전문 버프/디버프)
-        laboratory: { name: '연구소', icon: '🔬', costs: [120], ranges: [100], effect: { type: 'damage_buff', value: 1.5 }, description: '주변 타워 공격력 +50%', shortDesc: '공격력 버프', unlockActivity: 'study', unlockCount: 2, unlocked: false },
+        laboratory: { name: '연구소', icon: '�', costs: [120], ranges: [100], effect: { type: 'damage_buff', value: 1.5 }, description: '주변 타워 공격력 +50%', shortDesc: '공격력 버프', unlockActivity: 'study', unlockCount: 2, unlocked: false },
         warDrums: { name: '전장의 북', icon: '🥁', costs: [120], ranges: [0], description: '액티브: 모든 병사 공속 +100%', shortDesc: '병사 공속', skill: { cost: 50, cooldown: 1800, duration: 480, effect: 'attack_speed_boost' }, unlockActivity: 'exercise', unlockCount: 2, unlocked: false },
         weaknessAnalyzer: { name: '약점 분석기', icon: '👁️', costs: [120], ranges: [100], effect: { type: 'debuff', value: 1.3 }, description: '주변 적이 받는 피해량 +30%', shortDesc: '피해 증폭', unlockActivity: 'read', unlockCount: 2, unlocked: false },
     },
@@ -277,11 +284,11 @@ const GameConfig = {
         }
     ],
 
-    // 활동 데이터
+    // 활동 데이터 (30분으로 수정)
     activities: {
-        study: { name: '공부', duration: 30 * 60*60, reward: 100 },
-        exercise: { name: '운동', duration: 30 * 60*60, reward: 100 },
-        read: { name: '독서', duration: 10 * 60, reward: 100 },
+        study: { name: '공부', duration: 30 * 60 * 60, reward: 100 },
+        exercise: { name: '운동', duration: 30 * 60 * 60, reward: 100 },
+        read: { name: '독서', duration: 30 * 60 * 60, reward: 100 },
     }
 };
 
@@ -327,6 +334,8 @@ const ui = {
     confirmText: document.getElementById('confirm-text'),
     confirmYesButton: document.getElementById('confirm-yes-button'),
     confirmNoButton: document.getElementById('confirm-no-button'),
+    pauseButton: document.getElementById('pause-button'),
+    pauseOverlay: document.getElementById('pause-overlay'),
 };
 
 let gameState = {};
@@ -1111,7 +1120,9 @@ function initGame() {
         activityInProgress: null,
         activityTimer: 0,
         completedActivities: { study: 0, exercise: 0, read: 0, total: 0 },
-        timeoutIds: [],
+        spawnQueue: [],
+        waveStartTime: 0,
+        pauseStartTime: 0,
         preWaveState: null,
     };
     
@@ -1196,29 +1207,40 @@ function nextRound() {
 }
 
 function gameLoop() {
-    if (gameState.gameOver) return;
-    gameState.animationFrameId = requestAnimationFrame(gameLoop);
-    if (gameState.isPaused) return;
+    if (!gameState.isPaused) {
+        updateGame();
+    }
+    drawGame();
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawPath();
-    drawTowerSlots();
+    if (!gameState.gameOver) {
+        gameState.animationFrameId = requestAnimationFrame(gameLoop);
+    }
+}
 
+function updateGame() {
     if (gameState.activityInProgress) {
         gameState.activityTimer--;
-        drawActivityTimer();
         if (gameState.activityTimer <= 0) completeActivity();
     }
 
-    [...gameState.towers, ...gameState.soldiers, ...gameState.enemies, ...gameState.projectiles, ...gameState.particles, ...gameState.areaOfEffects, ...gameState.delayedBombs].forEach(e => e.update());
+    if (gameState.waveInProgress && !gameState.spawningComplete) {
+        const elapsedTime = performance.now() - gameState.waveStartTime;
+        for (let i = gameState.spawnQueue.length - 1; i >= 0; i--) {
+            const spawnEvent = gameState.spawnQueue[i];
+            if (elapsedTime >= spawnEvent.time) {
+                const spawnOffset = { x: (Math.random() - 0.5) * 15, y: (Math.random() - 0.5) * 15 };
+                gameState.enemies.push(new Enemy(spawnEvent.type, gameState.currentRound, spawnOffset));
+                gameState.spawnQueue.splice(i, 1);
+            } else {
+                break; 
+            }
+        }
+        if (gameState.spawnQueue.length === 0) {
+            gameState.spawningComplete = true;
+        }
+    }
 
-    gameState.areaOfEffects.forEach(e => e.draw());
-    gameState.towers.forEach(e => e.draw());
-    gameState.soldiers.sort((a, b) => a.y - b.y).forEach(e => e.draw());
-    gameState.enemies.sort((a, b) => a.y - b.y).forEach(e => e.draw());
-    gameState.projectiles.forEach(e => e.draw());
-    gameState.delayedBombs.forEach(e => e.draw());
-    gameState.particles.forEach(e => e.draw());
+    [...gameState.towers, ...gameState.soldiers, ...gameState.enemies, ...gameState.projectiles, ...gameState.particles, ...gameState.areaOfEffects, ...gameState.delayedBombs].forEach(e => e.update());
 
     gameState.enemies = gameState.enemies.filter(e => e.active);
     gameState.projectiles = gameState.projectiles.filter(e => e.active);
@@ -1231,6 +1253,23 @@ function gameLoop() {
         endWave();
     }
 }
+
+function drawGame() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawPath();
+    drawTowerSlots();
+    if (gameState.activityInProgress) {
+        drawActivityTimer();
+    }
+    gameState.areaOfEffects.forEach(e => e.draw());
+    gameState.towers.forEach(e => e.draw());
+    gameState.soldiers.sort((a, b) => a.y - b.y).forEach(e => e.draw());
+    gameState.enemies.sort((a, b) => a.y - b.y).forEach(e => e.draw());
+    gameState.projectiles.forEach(e => e.draw());
+    gameState.delayedBombs.forEach(e => e.draw());
+    gameState.particles.forEach(e => e.draw());
+}
+
 
 function startWave() {
     if (gameState.waveInProgress || gameState.activityInProgress) return;
@@ -1255,33 +1294,24 @@ function startWave() {
     const roundWaves = GameConfig.waveCompositionsByRound[gameState.currentRound - 1];
     let waveComposition = roundWaves.waves[gameState.currentWave - 1];
     
-    let totalSpawnTime = 0;
-    
+    gameState.spawnQueue = [];
+    const frameDurationMs = 1000 / 60; // Assuming game runs at 60fps, interval is in frames
+
     waveComposition.forEach(([type, count, interval]) => {
         for (let i = 0; i < count; i++) {
-            const spawnTime = i * interval;
-            const timeoutId = setTimeout(() => {
-                if (!gameState.gameOver) {
-                    const spawnOffset = { x: (Math.random() - 0.5) * 15, y: (Math.random() - 0.5) * 15 };
-                    gameState.enemies.push(new Enemy(type, gameState.currentRound, spawnOffset));
-                }
-            }, spawnTime);
-            gameState.timeoutIds.push(timeoutId);
-            if(spawnTime > totalSpawnTime) totalSpawnTime = spawnTime;
+            const spawnTimeMs = i * interval * frameDurationMs;
+            gameState.spawnQueue.push({ time: spawnTimeMs, type: type });
         }
     });
-
-    const completionTimeoutId = setTimeout(() => {
-        if (!gameState.gameOver) gameState.spawningComplete = true;
-    }, totalSpawnTime + 1);
-    gameState.timeoutIds.push(completionTimeoutId);
+    
+    gameState.spawnQueue.sort((a, b) => a.time - b.time);
+    gameState.waveStartTime = performance.now();
 }
 
 function endWave() {
     gameState.waveInProgress = false;
     gameState.spawningComplete = false;
-    gameState.timeoutIds.forEach(clearTimeout);
-    gameState.timeoutIds = [];
+    gameState.spawnQueue = [];
     updateDynamicButtons();
 
     if (gameState.currentWave >= gameState.totalWavesPerRound) {
@@ -1298,8 +1328,6 @@ function endWave() {
 function gameOver(isVictory) {
     if (gameState.gameOver) return;
     gameState.gameOver = true;
-    cancelAnimationFrame(gameState.animationFrameId);
-    gameState.timeoutIds.forEach(clearTimeout);
     
     ui.modalTitle.textContent = isVictory ? "🎉 최종 승리! 🎉" : "게임 오버";
     ui.modalText.textContent = isVictory ? "모든 적을 막아냈습니다!" : `코어가 파괴되었습니다. (라운드 ${gameState.currentRound} - 웨이브 ${gameState.currentWave})`;
@@ -1313,9 +1341,6 @@ function retryWave() {
         playSound('error');
         return;
     };
-
-    gameState.timeoutIds.forEach(id => clearTimeout(id));
-    gameState.timeoutIds = [];
     
     const snapshot = gameState.preWaveState;
     gameState.health = snapshot.health;
@@ -1329,6 +1354,7 @@ function retryWave() {
     gameState.soldiers = [];
     gameState.areaOfEffects = [];
     gameState.delayedBombs = [];
+    gameState.spawnQueue = [];
 
     // Rebuild towers from snapshot
     gameState.towerSlots.forEach(slot => slot.tower = null);
@@ -1649,8 +1675,8 @@ function drawActivityTimer() {
     ctx.fillStyle = "#22c55e";
     ctx.fillRect(barX, 20, barWidth * progress, 30);
     
-    const totalSeconds = Math.ceil(gameState.activityTimer / 60);
-    const timeString = `${String(totalSeconds).padStart(2, '0')}초`;
+    const totalMinutes = Math.ceil(gameState.activityTimer / (60 * 60));
+    const timeString = `${String(totalMinutes).padStart(2, '0')}분`;
 
     ctx.fillStyle = "white";
     ctx.font = "16px Jua";
@@ -1685,6 +1711,27 @@ function playSound(type) {
             case 'error': synth.triggerAttackRelease("F#3", "8n", scheduledTime); break;
         }
     } catch(e) { console.error("Sound error", e); }
+}
+
+// ==================================
+// 일시정지 기능
+// ==================================
+function togglePause() {
+    gameState.isPaused = !gameState.isPaused;
+    if (gameState.isPaused) {
+        ui.pauseButton.textContent = "계속하기";
+        ui.pauseOverlay.classList.remove('hidden');
+        gameState.pauseStartTime = performance.now();
+    } else {
+        ui.pauseButton.textContent = "일시정지";
+        ui.pauseOverlay.classList.add('hidden');
+        const pauseDuration = performance.now() - gameState.pauseStartTime;
+        gameState.waveStartTime += pauseDuration;
+        if(gameState.activityInProgress) {
+            const activityPauseDurationFrames = Math.round(pauseDuration / (1000/60));
+            gameState.activityTimer += activityPauseDurationFrames;
+        }
+    }
 }
 
 // ==================================
@@ -1768,6 +1815,8 @@ function setupEventListeners() {
         ui.confirmModal.style.display = 'none';
     });
 
+    ui.pauseButton.addEventListener('click', togglePause);
+
     // 초기 모달 설정
     ui.modalTitle.textContent = "자기계발 디펜스";
     ui.modalText.textContent = "다가오는 적들로부터 코어를 지켜내세요! 활동으로 타워를 해금하고, 건설하여 승리하세요.";
@@ -1808,20 +1857,23 @@ function drawTowerSlots() {
         ctx.stroke();
     });
 }
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js') // sw.js 파일의 경로를 정확히 지정
-      .then(registration => {
-        console.log('Service Worker 등록 성공:', registration.scope);
-      })
-      .catch(error => {
-        console.error('Service Worker 등록 실패:', error);
-      });
-  });
-}
+
 // 게임 시작
 setupEventListeners();
 
 </script>
+<script>
+    // 서비스 워커 등록 스크립트
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').then(registration => {
+                console.log('ServiceWorker registration successful with scope: ', registration.scope);
+            }, err => {
+                console.log('ServiceWorker registration failed: ', err);
+            });
+        });
+    }
+</script>
 </body>
 </html>
+�
